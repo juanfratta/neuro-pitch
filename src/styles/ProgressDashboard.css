@@ -1,0 +1,293 @@
+/* ProgressDashboard Component - User Mode */
+
+.progress-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.progress-dashboard.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.progress-dashboard section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.progress-dashboard h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #333;
+}
+
+.progress-dashboard h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 6px 0;
+  color: #444;
+}
+
+/* Level section */
+
+.level-section {
+  padding: 12px;
+  background: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+
+.level-display {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.level-number {
+  font-size: 36px;
+  font-weight: bold;
+  color: #333;
+  line-height: 1;
+}
+
+.level-of-total {
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+.level-notes {
+  font-size: 12px;
+  color: #666;
+  word-break: break-word;
+}
+
+.level-notes strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* Level criteria */
+
+.level-criteria {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #ddd;
+}
+
+.criterion {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.criterion label {
+  color: #666;
+}
+
+.criterion .value {
+  font-weight: 600;
+  color: #333;
+}
+
+.criterion .value.met {
+  color: #2ecc71;
+}
+
+.criterion .value.not-met {
+  color: #e74c3c;
+}
+
+/* Progress bar */
+
+.progress-bar-section {
+  padding: 12px;
+  background: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+
+.progress-bar-section label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 12px;
+  background: #eee;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #333;
+  transition: width 0.3s ease;
+}
+
+/* Stats */
+
+.stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.stat-card {
+  padding: 8px 12px;
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.stat-card.highlighted {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  border: 1.5px solid rgba(102, 126, 234, 0.3);
+  font-weight: 500;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  margin: 4px 0;
+}
+
+.stat-detail {
+  font-size: 11px;
+  color: #999;
+  margin-top: 2px;
+}
+
+/* State info */
+
+.state-section {
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #666;
+}
+
+/* Next step */
+
+.next-step {
+  padding: 10px 12px;
+  background: #e8f5e9;
+  border: 1px solid #2ecc71;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1b5e20;
+  text-align: center;
+}
+
+.next-step p {
+  margin: 0;
+}
+
+/* Advancement section */
+
+.advancement-section {
+  padding: 12px;
+  background: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.advancement-section h3 {
+  margin: 0 0 4px 0;
+}
+
+.requirement-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.requirement-item label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.requirement-status {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 6px;
+  border-radius: 3px;
+  background: #f5f5f5;
+}
+
+.requirement-status.met {
+  color: #1b5e20;
+  background: #e8f5e9;
+}
+
+.requirement-status.unmet {
+  color: #c62828;
+  background: #ffebee;
+}
+
+/* Advancement button */
+
+.advancement-button {
+  padding: 12px;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  border: 2px solid #ccc;
+  margin-top: 4px;
+}
+
+.advancement-button p {
+  margin: 0;
+}
+
+.advancement-button.disabled {
+  background: #e8e8e8;
+  color: #999;
+  border-color: #ccc;
+}
+
+.advancement-button.enabled {
+  background: #e8f5e9;
+  color: #1b5e20;
+  border-color: #2ecc71;
+}

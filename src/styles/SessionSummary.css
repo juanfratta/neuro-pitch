@@ -1,0 +1,127 @@
+.session-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.session-summary.excellent {
+  background: linear-gradient(135deg, rgba(46, 204, 113, 0.1) 0%, rgba(46, 204, 113, 0.05) 100%);
+}
+
+.session-summary.good {
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.1) 0%, rgba(52, 152, 219, 0.05) 100%);
+}
+
+.session-summary.fair {
+  background: linear-gradient(135deg, rgba(241, 196, 15, 0.1) 0%, rgba(241, 196, 15, 0.05) 100%);
+}
+
+.session-summary.needs-work {
+  background: linear-gradient(135deg, rgba(230, 126, 34, 0.1) 0%, rgba(230, 126, 34, 0.05) 100%);
+}
+
+.summary-content {
+  text-align: center;
+  max-width: 500px;
+}
+
+.summary-content h2 {
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.accuracy-display {
+  margin: 2rem 0;
+  padding: 2rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+}
+
+.accuracy-label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.5rem;
+}
+
+.accuracy-value {
+  font-size: 3.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.trials-info {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 1.5rem 0;
+}
+
+.feedback-message {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  margin: 2rem 0 1.5rem 0;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+.continue-prompt {
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+  margin-top: 2rem;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 480px) {
+  .session-summary {
+    padding: 1.5rem;
+  }
+
+  .summary-content h2 {
+    font-size: 1.3rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .accuracy-display {
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+  }
+
+  .accuracy-value {
+    font-size: 2.5rem;
+  }
+
+  .feedback-message {
+    font-size: 1rem;
+  }
+}
