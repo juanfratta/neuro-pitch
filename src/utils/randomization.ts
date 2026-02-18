@@ -99,8 +99,11 @@ export class RandomizationEngine {
    * Generate next trial ensuring anti-relative-pitch compliance
    */
   generateTrial(): TrialParams {
-    // Decide if this should be an out-of-set trial (for detection)
-    const useOutOfSet = !this.isTestMode && this.rng.random() < this.outOfSetProbability;
+    // Decide if this should be an out-of-set trial (for detection).
+    // Keep level-1 (2-note set) strictly in-set to avoid introducing foreign notes.
+    const canUseOutOfSet = this.currentNoteSet.length > 2;
+    const useOutOfSet =
+      !this.isTestMode && canUseOutOfSet && this.rng.random() < this.outOfSetProbability;
 
     // Select note set for this trial
     let availableNotes = useOutOfSet
@@ -137,20 +140,28 @@ export class RandomizationEngine {
    */
   private filterAvailableNotes(availableNotes: ChromaticNote[]): ChromaticNote[] {
     let filtered = [...availableNotes];
+    const noteSetSize = this.currentNoteSet.length;
 
     // Rule 1: No consecutive identical notes
-    if (ANTI_RELATIVE_PITCH_RULES.prohibitConsecutiveRepeat && this.lastNote) {
+    // For 2-note sets, allow repeats so distribution is not forced into near-deterministic alternation.
+    if (
+      ANTI_RELATIVE_PITCH_RULES.prohibitConsecutiveRepeat &&
+      this.lastNote &&
+      noteSetSize > 2
+    ) {
       filtered = filtered.filter((n) => n !== this.lastNote);
     }
 
     // Rule 2: No A-B-A pattern
+    // Prevent selecting the note from 2 trials ago if it's different from last trial
     if (
       ANTI_RELATIVE_PITCH_RULES.prohibitABA &&
       this.last2Notes &&
-      this.last2Notes[0] === this.last2Notes[1]
+      this.last2Notes[0] !== this.last2Notes[1] &&
+      noteSetSize > 2
     ) {
-      // If last two notes are same (shouldn't happen, but guard), skip this rule
-      // Otherwise, prevent creating A-B-A
+      // last2Notes[0] is from 2 trials ago, last2Notes[1] is from 1 trial ago
+      // Prevent selecting last2Notes[0] to avoid A-B-A pattern
       filtered = filtered.filter((n) => n !== this.last2Notes![0]);
     }
 
