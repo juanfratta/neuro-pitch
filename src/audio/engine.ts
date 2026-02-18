@@ -54,6 +54,7 @@ export class AudioEngine {
   private synthInstrument: any = null;
   private isInitializing = false;
   private initializePromise: Promise<void> | null = null;
+  private currentNoteController: AbortController | null = null;
 
   constructor() {
     // Initialize on first use to avoid SSR issues
@@ -176,6 +177,15 @@ export class AudioEngine {
   ): Promise<void> {
     await this.ensureInstrumentsLoaded();
 
+    // Cancel any currently playing note
+    if (this.currentNoteController) {
+      this.currentNoteController.abort();
+    }
+
+    // Create new abort controller for this note
+    this.currentNoteController = new AbortController();
+    const signal = this.currentNoteController.signal;
+
     const instrument = this.getInstrument(timbre);
     if (!instrument) {
       throw new Error(`Unknown timbre: ${timbre}`);
@@ -188,12 +198,21 @@ export class AudioEngine {
         throw new Error('AudioContext not initialized');
       }
 
+      // If already aborted, don't play
+      if (signal.aborted) {
+        return;
+      }
+
       // Play the note for the specified duration
       await instrument.play(midiNote, this.audioContext.currentTime, {
         duration: duration,
         gain: 1.0, // Full volume for clear pitch perception
       });
     } catch (error) {
+      // Ignore abort errors
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
       console.error(`Failed to play note ${note}${octave}:`, error);
       throw error;
     }
