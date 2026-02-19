@@ -1,97 +1,90 @@
-/**
- * Training Session Component - Refactored
- * 
- * Orchestrates the trial loop using:
- * - useAudioTrial: Handles audio playback + feedback
- * - useSessionProgression: Tracks trial progression
- * - Sub-components: TrialPlayback, NoteSelector, TrialFeedback
- * 
- * Only has 1 useEffect (initialization)
- * No refs, no duplicate code
- * Clean separation of concerns
- */
-
-import React, { useState, useEffect, useRef } from 'react';
-import { useProtocol } from '../state/protocol-context';
+import React, { useEffect, useRef, useState } from 'react';
 import { getAudioEngine } from '../audio/engine';
+import { createTrial } from '../services/storage';
+import { getNotesForLevel, PROTOCOL_CONFIG } from '../protocol/config';
+import { useProtocol } from '../state/protocol-context';
 import { useAudioTrial } from '../hooks/useAudioTrial';
 import { useSessionProgression } from '../hooks/useSessionProgression';
-import { RandomizationEngine, createTrainingRandomizer } from '../utils/randomization';
-import { PROTOCOL_CONFIG, getNotesForLevel } from '../protocol/config';
-import { createTrial } from '../services/storage';
-import { SessionSummary } from './SessionSummary';
-import { TrialPlayback } from './TrialPlayback';
+import { createTrainingRandomizer, RandomizationEngine } from '../utils/randomization';
 import { NoteSelector } from './TrialNoteSelector';
 import { TrialFeedback } from './TrialFeedback';
-import '../styles/TrainingSession.css';
+import { TrialPlayback } from './TrialPlayback';
+import { SessionSummary } from './SessionSummary';
 
 export const TrainingSession: React.FC = () => {
-  const { user, currentSession, submitSessionResponse, addTrialToSession, completeCurrentSession } =
-    useProtocol();
-
-  // Custom hooks for audio and session progression
+  const { user, currentSession, submitSessionResponse, addTrialToSession, completeCurrentSession } = useProtocol();
   const audioEngine = getAudioEngine();
   const { trialState, feedback, playTrial, submitResponse, isReady } = useAudioTrial(audioEngine);
-  const { trials, addTrial, currentTrialNumber, isSessionComplete } = useSessionProgression(
-    PROTOCOL_CONFIG.trialsPerSession
-  );
+  const { trials, addTrial } = useSessionProgression(PROTOCOL_CONFIG.trialsPerSession);
 
-  // UI state only
   const [selectedNote, setSelectedNote] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(false);
   const [currentTrialData, setCurrentTrialData] = useState<any>(null);
 
-  // Track if we've started the session
   const hasStartedRef = useRef(false);
   const randomizerRef = useRef<RandomizationEngine | null>(null);
   const summaryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playedTrialKeyRef = useRef<string | null>(null);
+  const trialsCountRef = useRef(0);
+  const isFinishingSessionRef = useRef(false);
 
-  // Derived values (no state needed)
   const levelNotes = getNotesForLevel(user?.current_level || 1);
-  const sessionAccuracy =
+  const respondedTrialsCount =
+    currentSession?.trials.filter((trial) => trial.user_response !== null).length ?? 0;
+  const isSessionComplete = respondedTrialsCount >= PROTOCOL_CONFIG.trialsPerSession;
+  const sessionScore =
     currentSession && currentSession.trials.length > 0
-      ? (currentSession.trials.filter((t) => t.correct === true).length / currentSession.trials.length) * 100
+      ? (currentSession.trials.filter((trial) => trial.correct === true).length / currentSession.trials.length) * 100
       : 0;
+  const displayedTrialNumber = currentTrialData?.trialObject?.trial_number ?? Math.min(trials.length + 1, PROTOCOL_CONFIG.trialsPerSession);
+  const progressPercent = Math.min(100, Math.round((trials.length / PROTOCOL_CONFIG.trialsPerSession) * 100));
 
-  // Initialize randomizer once on mount
   useEffect(() => {
     if (!user || !currentSession) return;
 
-    const notes = getNotesForLevel(user.current_level);
-    randomizerRef.current = createTrainingRandomizer(user.current_level, notes);
-    hasStartedRef.current = false; // Reset for new session
+    randomizerRef.current = createTrainingRandomizer(user.current_level, getNotesForLevel(user.current_level));
+    hasStartedRef.current = false;
+    playedTrialKeyRef.current = null;
+    isFinishingSessionRef.current = false;
 
     return () => {
       if (summaryTimeoutRef.current) clearTimeout(summaryTimeoutRef.current);
     };
   }, [user?.id, currentSession?.id]);
 
-  // Auto-play first trial when ready, then when feedback ends (idle state)
   useEffect(() => {
-    if (!isReady || !randomizerRef.current) return;
-    if (isSessionComplete) return;
+    if (!isReady || !randomizerRef.current || isSessionComplete || isFinishingSessionRef.current) return;
 
-    // First time: start the session
     if (!hasStartedRef.current && trialState === 'idle') {
       hasStartedRef.current = true;
       playNextTrial();
       return;
     }
 
-    // Subsequent times: feedback ended, play next trial
     if (hasStartedRef.current && trialState === 'idle') {
       setSelectedNote(null);
       playNextTrial();
     }
   }, [isReady, trialState, isSessionComplete]);
 
-  // Detect session completion and show summary
+  useEffect(() => {
+    // If trial timed out (no selection) ensure it is recorded in session state.
+    if (!currentTrialData?.trialObject) return;
+    if (trialState !== 'feedback' || selectedNote !== null) return;
+
+    const trialId = currentTrialData.trialObject.id;
+    const alreadySubmitted = currentSession?.trials.find((trial) => trial.id === trialId)?.user_response !== null;
+    if (alreadySubmitted) return;
+
+    submitSessionResponse(trialId, 'NONE', PROTOCOL_CONFIG.trialTimeout);
+  }, [trialState, selectedNote, currentTrialData, currentSession, submitSessionResponse]);
+
   useEffect(() => {
     if (!isSessionComplete) return;
-
+    if (trialState !== 'idle') return;
+    audioEngine.stopAll();
     setShowSummary(true);
 
-    // Auto-finalize after 4 seconds
     if (summaryTimeoutRef.current) clearTimeout(summaryTimeoutRef.current);
     summaryTimeoutRef.current = setTimeout(() => {
       completeCurrentSession();
@@ -100,23 +93,23 @@ export const TrainingSession: React.FC = () => {
     return () => {
       if (summaryTimeoutRef.current) clearTimeout(summaryTimeoutRef.current);
     };
-  }, [isSessionComplete, completeCurrentSession]);
+  }, [isSessionComplete, trialState, completeCurrentSession, audioEngine]);
 
-  // Generate and play next trial
+  useEffect(() => {
+    trialsCountRef.current = trials.length;
+  }, [trials.length]);
+
   const playNextTrial = async () => {
-    if (!randomizerRef.current || currentTrialNumber > PROTOCOL_CONFIG.trialsPerSession) return;
+    if (!randomizerRef.current || showSummary || isSessionComplete || isFinishingSessionRef.current) return;
+    const nextTrialNumber = trialsCountRef.current + 1;
+    if (nextTrialNumber > PROTOCOL_CONFIG.trialsPerSession) return;
 
-    // Generate trial parameters
+    const trialKey = `${currentSession?.id}-${nextTrialNumber}`;
+    if (playedTrialKeyRef.current === trialKey) return;
+    playedTrialKeyRef.current = trialKey;
+
     const trialParams = randomizerRef.current.generateTrial();
-
-    // Create trial object
-    const trial = createTrial(
-      currentTrialNumber,
-      trialParams.note,
-      trialParams.octave,
-      trialParams.timbre,
-      trialParams.seed
-    );
+    const trial = createTrial(nextTrialNumber, trialParams.note, trialParams.octave, trialParams.timbre, trialParams.seed);
 
     setCurrentTrialData({
       note: trial.note,
@@ -125,11 +118,9 @@ export const TrainingSession: React.FC = () => {
       trialObject: trial,
     });
 
-    // Add to session tracking
     addTrial(trial);
     addTrialToSession(trial);
 
-    // Play audio
     await playTrial({
       note: trial.note,
       octave: trial.octave,
@@ -137,79 +128,70 @@ export const TrainingSession: React.FC = () => {
     });
   };
 
-  // Handle user note selection
   const handleNoteClick = (note: string) => {
     if (trialState !== 'waiting_response' || selectedNote) return;
-
     setSelectedNote(note);
 
-    // Submit response via custom hook
     const { reactionTime } = submitResponse(note);
-
-    // Record in protocol context
     if (currentTrialData?.trialObject) {
+      if (currentTrialData.trialObject.trial_number >= PROTOCOL_CONFIG.trialsPerSession) {
+        isFinishingSessionRef.current = true;
+      }
       submitSessionResponse(currentTrialData.trialObject.id, note, reactionTime);
     }
   };
 
-  // Loading state
   if (!user || !currentSession) {
-    return <div className="training-session loading">Cargando sesión...</div>;
-  }
-
-  // Show summary
-  if (showSummary && isSessionComplete) {
     return (
-      <SessionSummary
-        accuracy={sessionAccuracy}
-        trialsCompleted={trials.length}
-        onContinue={() => completeCurrentSession()}
-      />
+      <div className="flex min-h-[26rem] items-center justify-center">
+        <p className="text-sm text-slate-500 dark:text-slate-400">Cargando sesión...</p>
+      </div>
     );
   }
 
-  // Main trial rendering
+  if (showSummary && isSessionComplete) {
+    return <SessionSummary accuracy={sessionScore} trialsCompleted={trials.length} onContinue={() => completeCurrentSession()} />;
+  }
+
   return (
-    <div className="training-session">
-      {/* Header */}
-      <div className="session-header">
-        <div className="level-indicator">Nivel {user.current_level} de 10</div>
-        <div className="trial-indicator">
-          {currentTrialNumber} / {PROTOCOL_CONFIG.trialsPerSession}
+    <div className="space-y-5">
+      <div className="space-y-3">
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Sesión activa</p>
+            <p className="text-lg font-semibold text-slate-900 dark:text-white">Nivel {user.current_level}</p>
+          </div>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {displayedTrialNumber} / {PROTOCOL_CONFIG.trialsPerSession}
+          </p>
+        </div>
+
+        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+          <div className="h-full rounded-full bg-cyan-500 transition-all dark:bg-cyan-400" style={{ width: `${progressPercent}%` }} />
         </div>
       </div>
 
-      {/* Main display */}
-      <div className="trial-display">
-        {trialState === 'playing' && currentTrialData && (
-          <TrialPlayback />
-        )}
+      <div className="flex min-h-[16rem] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50/70 px-4 dark:border-slate-800 dark:bg-slate-900/60">
+        {trialState === 'playing' && currentTrialData && <TrialPlayback />}
 
         {trialState === 'waiting_response' && (
-          <div className="response-prompt">
-            <p>¿Qué nota escuchaste?</p>
-            {selectedNote && <div className="selected-note">{selectedNote}</div>}
+          <div className="text-center">
+            <p className="text-lg font-semibold text-slate-900 dark:text-white">¿Qué nota escuchaste?</p>
+            {selectedNote && (
+              <p className="mt-3 font-mono text-5xl font-semibold text-cyan-600 dark:text-cyan-300">{selectedNote}</p>
+            )}
           </div>
         )}
 
-        {trialState === 'feedback' && feedback && currentTrialData && (
-          <TrialFeedback feedback={feedback} correctNote={currentTrialData.note} />
-        )}
+        {trialState === 'feedback' && feedback && currentTrialData && <TrialFeedback feedback={feedback} correctNote={currentTrialData.note} />}
       </div>
 
-      {/* Note selection buttons (only for current level notes) */}
       {trialState === 'waiting_response' && (
-        <NoteSelector
-          availableNotes={levelNotes}
-          onSelect={handleNoteClick}
-          disabled={selectedNote !== null}
-          selectedNote={selectedNote}
-        />
+        <NoteSelector availableNotes={levelNotes} onSelect={handleNoteClick} disabled={selectedNote !== null} selectedNote={selectedNote} />
       )}
 
-      {/* Protocol instruction banner */}
-      <div className="protocol-instruction">
-        <p>No cantar, tararear ni usar instrumentos. Escucha únicamente la nota aislada.</p>
+      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+        Sin cantar ni tararear. Solo escucha y responde.
       </div>
     </div>
   );

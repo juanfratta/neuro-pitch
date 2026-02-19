@@ -105,6 +105,16 @@ export const RETENTION_TEST_SCHEDULE = {
 };
 
 /**
+ * Retention test length (trial count)
+ * Week tests are shorter checkpoints; final mirrors paper-scale evaluation.
+ */
+export const RETENTION_TEST_TRIALS = {
+  week2: 24,
+  week4: 48,
+  final: 144,
+} as const;
+
+/**
  * Anti-relative-pitch controls
  * Applied during training AND testing to prevent relational listening
  */
@@ -112,7 +122,7 @@ export const ANTI_RELATIVE_PITCH_RULES = {
   prohibitConsecutiveRepeat: true, // Can't play same note twice in a row
   prohibitABA: true, // Can't have A-B-A pattern
   prohibitABCBA: true, // Can't have reversal patterns
-  octaveMixing: true, // Always mix octaves 3, 4, 5, 6
+  octaveMixing: true, // Training and tests mix the global OCTAVES range
   minOctavaGapInTests: 1, // Minimum gap > 1 octave between notes in tests
   randomSeed: true, // Every trial uses explicit seed
   includeOutOfSetTrials: 0.1, // 10% of trials use notes outside current set (detection)

@@ -1,16 +1,3 @@
-/**
- * Component: TrialFeedback
- * 
- * Displays feedback after user response
- * Shows:
- * - "Correct" (green) if user response matches note + reaction time < threshold
- * - "Slow" (orange) if correct but reaction time > threshold
- * - "Incorrect" (red) if user response doesn't match
- * 
- * Memoized for performance
- * Displays correctly reported note in feedback message
- */
-
 import React from 'react';
 
 interface TrialFeedbackProps {
@@ -18,25 +5,33 @@ interface TrialFeedbackProps {
   correctNote: string;
 }
 
-export const TrialFeedback = React.memo<TrialFeedbackProps>(({ feedback, correctNote }) => {
-  const feedbackLabels = {
-    correct: '✓ Correcto',
-    incorrect: `✗ Incorrecto, era ${correctNote}`,
-    slow: '⏱️ Lento',
-  };
+const feedbackUI = {
+  correct: {
+    title: 'Bien',
+    detail: 'Respuesta correcta',
+    tone: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300',
+  },
+  incorrect: {
+    title: 'Casi',
+    detail: 'La nota era',
+    tone: 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-300',
+  },
+  slow: {
+    title: 'Lento',
+    detail: 'Tiempo agotado. La nota era',
+    tone: 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/40 dark:text-rose-300',
+  },
+};
 
-  const feedbackColors = {
-    correct: '#2ecc71', // Green
-    incorrect: '#e74c3c', // Red
-    slow: '#f39c12', // Orange
-  };
+export const TrialFeedback = React.memo<TrialFeedbackProps>(({ feedback, correctNote }) => {
+  const ui = feedbackUI[feedback];
 
   return (
-    <div
-      className="feedback-display"
-      style={{ borderColor: feedbackColors[feedback] }}
-    >
-      <p>{feedbackLabels[feedback]}</p>
+    <div className={`rounded-xl border px-5 py-4 text-center ${ui.tone}`}>
+      <p className="text-xl font-semibold">{ui.title}</p>
+      <p className="mt-1 text-sm">
+        {feedback === 'correct' ? ui.detail : `${ui.detail} ${correctNote}`}
+      </p>
     </div>
   );
 });

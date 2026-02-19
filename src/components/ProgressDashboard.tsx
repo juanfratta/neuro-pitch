@@ -1,168 +1,91 @@
-/**
- * Progress Dashboard - User Mode
- * Simple, minimal display of training progress
- * 
- * Shows:
- * - Current level (1-10)
- * - Sessions completed at current level
- * - Overall accuracy
- * - Next milestone (next level or test)
- * 
- * No gamification, no badges, no rankings
- */
-
 import React from 'react';
 import { useProtocol } from '../state/protocol-context';
 import { PROTOCOL_CONFIG } from '../protocol/config';
-import '../styles/ProgressDashboard.css';
 
 export const ProgressDashboard: React.FC = () => {
   const { user, consecutiveSuccessfulSessions, protocolState } = useProtocol();
 
   if (!user) {
-    return <div className="progress-dashboard loading">Cargando datos...</div>;
+    return <div className="text-sm text-slate-500 dark:text-slate-400">Cargando progreso...</div>;
   }
 
   const currentLevelNotes = PROTOCOL_CONFIG.levelNoteSet[user.current_level - 1] || [];
   const rtThreshold = PROTOCOL_CONFIG.rtThresholds[user.current_level - 1] || 0;
   const minAccuracy = PROTOCOL_CONFIG.minAccuracy;
+  const sessionsRequired = PROTOCOL_CONFIG.sessionsRequiredForAdvance;
 
-  // Get last session metrics
-  const lastSession = user.sessions.length > 0 ? user.sessions[user.sessions.length - 1] : null;
-  const lastSessionAccuracy = lastSession?.accuracy ?? 0;
+  const lastSession = user.sessions.at(-1) ?? null;
+  const lastSessionScore = lastSession?.accuracy ?? 0;
   const lastSessionRT = lastSession?.rt_avg ?? 0;
-
-  // Calculate overall stats
-  const totalTrials = user.training_history.total_trials;
-  const sessionCount = user.training_history.session_count;
-  const overallAccuracy =
+  const overallScore =
     user.sessions.length > 0
-      ? user.sessions.reduce((sum, s) => sum + s.accuracy, 0) / user.sessions.length
+      ? user.sessions.reduce((sum, session) => sum + session.accuracy, 0) / user.sessions.length
       : 0;
 
-  // Total sessions in current level (informational)
-  const totalSessionsAtLevel = user.sessions.filter((s) => s.level === user.current_level).length;
+  const totalSessionsAtLevel = user.sessions.filter((session) => session.level === user.current_level).length;
 
-  // Progress to next level
-  const sessionsRequiredForAdvance = PROTOCOL_CONFIG.sessionsRequiredForAdvance;
-  const progressToAdvance = Math.min(1.0, consecutiveSuccessfulSessions / sessionsRequiredForAdvance);
-
-  // Determine what's required
-  const meetsAccuracy = lastSessionAccuracy >= minAccuracy;
+  const meetsScore = lastSessionScore >= minAccuracy;
   const meetsRT = lastSessionRT <= rtThreshold;
-  const hasEnoughSessions = consecutiveSuccessfulSessions >= sessionsRequiredForAdvance;
+  const meetsConsistency = consecutiveSuccessfulSessions >= sessionsRequired;
+  const readyToAdvance = meetsScore && meetsRT && meetsConsistency;
+
+  const progress = Math.min(100, Math.round((consecutiveSuccessfulSessions / sessionsRequired) * 100));
 
   return (
-    <div className="progress-dashboard">
-      {/* Level Section */}
-      <section className="level-section">
-        <h2>Nivel Actual</h2>
-        <div className="level-display">
-          <div className="level-number">{user.current_level}</div>
-          <div className="level-of-total">de 10</div>
+    <div className="space-y-5">
+      <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Tu progreso</p>
+        <div className="mt-2 flex items-end justify-between">
+          <h2 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">{user.current_level}</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">de 10</p>
+        </div>
+        <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">Notas activas: {currentLevelNotes.join(' · ')}</p>
+      </section>
+
+      <section className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Última sesión</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">{lastSessionScore.toFixed(1)}%</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Aciertos</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Promedio general</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">{overallScore.toFixed(1)}%</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Aciertos</p>
+          </div>
         </div>
 
-        <div className="level-notes">
-          <strong>Notas en este nivel:</strong> {currentLevelNotes.join(', ')}
-        </div>
-
-        <div className="level-criteria">
-          <div className="criterion">
-            <label>Precisión última sesión:</label>
-            <div className={`value ${meetsAccuracy ? 'met' : 'not-met'}`}>
-              {lastSessionAccuracy.toFixed(1)}% {meetsAccuracy && '✓'}
-            </div>
+        <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+          <div className="mb-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <span>Constancia para avanzar</span>
+            <span>{consecutiveSuccessfulSessions}/{sessionsRequired}</span>
           </div>
-          <div className="criterion">
-            <label>RT máximo:</label>
-            <div className={`value ${meetsRT ? 'met' : 'not-met'}`}>
-              {lastSessionRT.toFixed(0)}ms {meetsRT && '✓'}
-            </div>
-          </div>
-          <div className="criterion">
-            <label>Sesiones en este nivel:</label>
-            <div className="value">
-              {totalSessionsAtLevel}
-            </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+            <div className="h-full rounded-full bg-cyan-500 transition-all dark:bg-cyan-400" style={{ width: `${progress}%` }} />
           </div>
         </div>
       </section>
 
-      {/* Progression bar */}
-      <section className="progress-bar-section">
-        <label>Progreso a siguiente nivel</label>
-        <div className="progress-bar">
-          <div className="progress-fill" style={{ width: `${progressToAdvance * 100}%` }}></div>
-        </div>
+      <section className="space-y-2 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Checklist de nivel</p>
+        <p className={`text-sm ${meetsScore ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'}`}>
+          {meetsScore ? 'OK' : 'Pendiente'} Aciertos mínimos: {minAccuracy}% ({lastSessionScore.toFixed(1)}%)
+        </p>
+        <p className={`text-sm ${meetsRT ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'}`}>
+          {meetsRT ? 'OK' : 'Pendiente'} Tiempo medio: ≤ {rtThreshold}ms ({lastSessionRT.toFixed(0)}ms)
+        </p>
+        <p className={`text-sm ${meetsConsistency ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'}`}>
+          {meetsConsistency ? 'OK' : 'Pendiente'} Sesiones consecutivas: {consecutiveSuccessfulSessions}/{sessionsRequired}
+        </p>
       </section>
 
-      {/* Stats Section */}
-      <section className="stats-section">
-        <h3>Estadísticas</h3>
-        <div className="stats-grid">
-          <div className="stat-card highlighted">
-            <div className="stat-label">Precisión general</div>
-            <div className="stat-value">{overallAccuracy.toFixed(1)}%</div>
-            <div className="stat-detail">promedio todas las sesiones</div>
-          </div>
-          <div className="stat-card highlighted">
-            <div className="stat-label">Última sesión</div>
-            <div className="stat-value">{lastSessionAccuracy.toFixed(1)}%</div>
-            <div className="stat-detail">mejor indicador de progreso</div>
-          </div>
-        </div>
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-label">Sesiones completadas</div>
-            <div className="stat-value">{sessionCount}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Trials totales</div>
-            <div className="stat-value">{totalTrials}</div>
-          </div>
-        </div>
-      </section>
-
-      {/* Protocol State */}
-      <section className="state-section">
-        <div className="state-info">
-          <strong>Estado:</strong> {protocolState === 'idle' ? 'Listo' : protocolState}
-        </div>
-      </section>
-
-      {/* Level Advancement Status */}
-      <section className="advancement-section">
-        <h3>Requisitos para avanzar</h3>
-        
-        <div className="requirement-item">
-          <label>Precisión mínima:</label>
-          <div className={`requirement-status ${meetsAccuracy ? 'met' : 'unmet'}`}>
-            {meetsAccuracy ? '✓' : '✗'} {minAccuracy}% (actual: {lastSessionAccuracy.toFixed(1)}%)
-          </div>
-        </div>
-
-        <div className="requirement-item">
-          <label>Tiempo de respuesta:</label>
-          <div className={`requirement-status ${meetsRT ? 'met' : 'unmet'}`}>
-            {meetsRT ? '✓' : '✗'} ≤ {rtThreshold}ms (actual: {lastSessionRT.toFixed(0)}ms)
-          </div>
-        </div>
-
-        <div className="requirement-item">
-          <label>Sesiones exitosas consecutivas:</label>
-          <div className={`requirement-status ${hasEnoughSessions ? 'met' : 'unmet'}`}>
-            {consecutiveSuccessfulSessions} / {sessionsRequiredForAdvance} (necesitas ≥90% accuracy)
-          </div>
-        </div>
-
-        {/* Advancement Button */}
-        <div className={`advancement-button ${hasEnoughSessions && meetsAccuracy && meetsRT ? 'enabled' : 'disabled'}`}>
-          {hasEnoughSessions && meetsAccuracy && meetsRT ? (
-            <p>✓ Completaste los 3 requisitos. ¡Estás listo para avanzar!</p>
-          ) : (
-            <p>Completa los 3 requisitos para desbloquear el siguiente nivel</p>
-          )}
-        </div>
+      <section className={`rounded-xl p-4 ${readyToAdvance ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'}`}>
+        <p className="text-sm font-semibold">{readyToAdvance ? 'Listo para avanzar de nivel' : 'Aún no cumples todos los requisitos'}</p>
+        <p className="mt-1 text-xs opacity-80">
+          Estado actual: {protocolState === 'idle' ? 'Listo para una nueva sesión' : protocolState}
+        </p>
+        <p className="mt-1 text-xs opacity-80">Sesiones completadas en este nivel: {totalSessionsAtLevel}</p>
       </section>
     </div>
   );

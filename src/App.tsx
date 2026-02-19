@@ -7,13 +7,11 @@
 
 import { ProtocolProvider } from './state/protocol-context';
 import { ProtocolGate } from './components/ProtocolGate';
-import './App.css';
-import './styles/global.css';
 
 function App() {
   return (
     <ProtocolProvider>
-      <div className="app-container">
+      <div className="min-h-screen">
         <ProtocolGate />
       </div>
     </ProtocolProvider>

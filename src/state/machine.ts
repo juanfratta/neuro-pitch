@@ -62,7 +62,8 @@ export function getNextState(
       break;
 
     case 'final_test':
-      if (transition === 'complete_test') return 'completed';
+      // Final test is repeatable; return to idle after each completion.
+      if (transition === 'complete_test') return 'idle';
       break;
 
     case 'completed':
