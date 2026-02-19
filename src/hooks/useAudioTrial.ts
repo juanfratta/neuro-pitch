@@ -59,23 +59,15 @@ export const useAudioTrial = (audioEngine: AudioEngine): UseAudioTrialReturn => 
       if (!isReady) return;
 
       currentTrialRef.current = params;
-      setTrialState('playing');
       setFeedback(null);
-
-      try {
-        await audioEngine.playNote(
-          params.note,
-          params.octave,
-          params.timbre,
-          PROTOCOL_CONFIG.audio.noteDuration
-        );
-      } catch (err) {
-        console.error('Error playing note:', err);
-      }
-
-      // Transition to waiting for response after audio finishes
       responseStartTimeRef.current = Date.now();
       setTrialState('waiting_response');
+
+      void audioEngine
+        .playNote(params.note, params.octave, params.timbre, PROTOCOL_CONFIG.audio.noteDuration)
+        .catch((err) => {
+          console.error('Error playing note:', err);
+        });
     },
     [isReady, audioEngine]
   );
@@ -95,7 +87,8 @@ export const useAudioTrial = (audioEngine: AudioEngine): UseAudioTrialReturn => 
     responseTimeoutRef.current = setTimeout(() => {
       // Submit with auto-response if timeout
       if (currentTrialRef.current && responseStartTimeRef.current) {
-        setFeedback('incorrect');
+        audioEngine.stopAll();
+        setFeedback('slow');
         setTrialState('feedback');
 
         feedbackTimeoutRef.current = setTimeout(() => {
@@ -108,7 +101,7 @@ export const useAudioTrial = (audioEngine: AudioEngine): UseAudioTrialReturn => 
     return () => {
       if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
     };
-  }, [trialState]);
+  }, [trialState, audioEngine]);
 
   // Submit user response
   const submitResponse = useCallback(
@@ -118,18 +111,12 @@ export const useAudioTrial = (audioEngine: AudioEngine): UseAudioTrialReturn => 
       }
 
       if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+      audioEngine.stopAll();
 
       const reactionTime = Date.now() - responseStartTimeRef.current;
       const isCorrect = userNote.toUpperCase() === currentTrialRef.current.note;
 
-      let fb: TrialFeedback = 'incorrect';
-      if (isCorrect) {
-        if (reactionTime > PROTOCOL_CONFIG.trialTimeout * 0.8) {
-          fb = 'slow';
-        } else {
-          fb = 'correct';
-        }
-      }
+      const fb: TrialFeedback = isCorrect ? 'correct' : 'incorrect';
 
       setFeedback(fb);
       setTrialState('feedback');
@@ -143,7 +130,7 @@ export const useAudioTrial = (audioEngine: AudioEngine): UseAudioTrialReturn => 
 
       return { reactionTime, feedback: fb };
     },
-    []
+    [audioEngine]
   );
 
   return {

@@ -5,7 +5,7 @@
  * Requirements:
  * - No consecutive identical notes
  * - No A-B-A patterns
- * - Mix octaves (3, 4, 5, 6)
+ * - Mix octaves (1, 2, 3, 4, 5, 6)
  * - Explicit seed for reproducibility
  * - Occasional out-of-set trials for detection
  */
@@ -45,7 +45,7 @@ class SeededRandom {
   /**
    * Get random element from array
    */
-  choice<T>(array: T[]): T {
+  choice<T>(array: readonly T[]): T {
     return array[Math.floor(this.random() * array.length)];
   }
 
@@ -80,6 +80,7 @@ export class RandomizationEngine {
   private allNotes: ChromaticNote[];
   private testTimbres: Timbre[];
   private isTestMode: boolean;
+  private octavePool: readonly Octave[];
 
   constructor(
     noteSet: ChromaticNote[],
@@ -89,9 +90,10 @@ export class RandomizationEngine {
     this.seed = seed ?? Math.floor(Math.random() * 0xffffffff);
     this.rng = new SeededRandom(this.seed);
     this.currentNoteSet = noteSet;
-    this.testTimbres = ['piano', 'sine'];
+    this.testTimbres = ['piano'];
     this.isTestMode = isTestMode;
     this.allNotes = CHROMATIC_NOTES;
+    this.octavePool = OCTAVES;
     this.outOfSetProbability = ANTI_RELATIVE_PITCH_RULES.includeOutOfSetTrials || 0.1;
   }
 
@@ -120,7 +122,7 @@ export class RandomizationEngine {
     }
 
     const selectedNote = this.rng.choice(availableNotes);
-    const selectedOctave = this.rng.choice(OCTAVES);
+    const selectedOctave = this.rng.choice(this.octavePool);
     const selectedTimbre = this.isTestMode ? this.rng.choice(this.testTimbres) : 'piano';
 
     // Update state

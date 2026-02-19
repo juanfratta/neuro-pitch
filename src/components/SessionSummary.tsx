@@ -1,11 +1,4 @@
-/**
- * Session Summary Component
- * Displays accuracy of the completed session
- * Shows before returning to level page
- */
-
 import React, { useEffect } from 'react';
-import '../styles/SessionSummary.css';
 
 interface SessionSummaryProps {
   accuracy: number;
@@ -13,54 +6,42 @@ interface SessionSummaryProps {
   onContinue: () => void;
 }
 
-export const SessionSummary: React.FC<SessionSummaryProps> = ({
-  accuracy,
-  trialsCompleted,
-  onContinue,
-}) => {
-  // Auto-continue after 4 seconds
+export const SessionSummary: React.FC<SessionSummaryProps> = ({ accuracy, trialsCompleted, onContinue }) => {
   useEffect(() => {
     const timer = setTimeout(onContinue, 4000);
     return () => clearTimeout(timer);
   }, [onContinue]);
 
-  // Determine feedback based on accuracy
-  let feedbackMessage = '';
-  let feedbackClass = '';
+  const tone =
+    accuracy >= 90
+      ? 'excelente'
+      : accuracy >= 75
+        ? 'bien'
+        : accuracy >= 60
+          ? 'en progreso'
+          : 'a practicar';
 
-  if (accuracy >= 90) {
-    feedbackMessage = '¡Excelente! Cumpliste los requisitos de este nivel.';
-    feedbackClass = 'excellent';
-  } else if (accuracy >= 75) {
-    feedbackMessage = 'Buen trabajo. Sigue practicando para mejorar.';
-    feedbackClass = 'good';
-  } else if (accuracy >= 60) {
-    feedbackMessage = 'Continúa practicando para mejorar tu precisión.';
-    feedbackClass = 'fair';
-  } else {
-    feedbackMessage = 'Necesitas más práctica. ¡No te desanimes!';
-    feedbackClass = 'needs-work';
-  }
+  const message =
+    accuracy >= 90
+      ? 'Muy buena sesión. Mantén este ritmo.'
+      : accuracy >= 75
+        ? 'Vas bien. Una sesión más sólida y subes.'
+        : accuracy >= 60
+          ? 'Progreso estable. Enfócate en responder más rápido.'
+          : 'Tómalo con calma. Repetir sesiones ayuda mucho.';
 
   return (
-    <div className={`session-summary ${feedbackClass}`}>
-      <div className="summary-content">
-        <h2>Sesión Completada</h2>
-
-        <div className="accuracy-display">
-          <div className="accuracy-label">Precisión</div>
-          <div className="accuracy-value">{accuracy.toFixed(1)}%</div>
+    <div className="flex min-h-[28rem] items-center justify-center">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Sesión terminada</p>
+        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-800/70">
+          <p className="text-xs text-slate-500 dark:text-slate-400">Resultado de hoy</p>
+          <p className="mt-2 text-5xl font-semibold text-slate-900 dark:text-white">{accuracy.toFixed(1)}%</p>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Aciertos en {trialsCompleted} intentos</p>
         </div>
-
-        <div className="trials-info">
-          <p>{trialsCompleted} intentos completados</p>
-        </div>
-
-        <div className="feedback-message">{feedbackMessage}</div>
-
-        <div className="continue-prompt">
-          <p>Volviendo a pantalla del nivel...</p>
-        </div>
+        <p className="mt-5 text-sm font-medium text-slate-700 dark:text-slate-200">{message}</p>
+        <p className="mt-2 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">{tone}</p>
+        <p className="mt-6 text-xs text-slate-500 dark:text-slate-400">Volviendo al panel...</p>
       </div>
     </div>
   );

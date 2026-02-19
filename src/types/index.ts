@@ -12,9 +12,9 @@ export type Timbre = 'piano' | 'sine';
 export const TRAINING_TIMBRE: Timbre = 'piano';
 export const TEST_TIMBRES: Timbre[] = ['piano', 'sine'];
 
-// Octaves range
-export type Octave = 3 | 4 | 5 | 6;
-export const OCTAVES: Octave[] = [3, 4, 5, 6];
+// Octaves range (single source of truth for training + tests)
+export const OCTAVES = [2, 3, 4, 5, 6] as const;
+export type Octave = (typeof OCTAVES)[number];
 
 // Response types
 export type TrialFeedback = 'correct' | 'incorrect' | 'slow';

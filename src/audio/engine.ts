@@ -6,7 +6,7 @@
  * - A4 = 440 Hz (fixed tuning via soundfont)
  * - Note duration: 4 seconds (per protocol)
  * - Instruments: Acoustic Piano, Synth Pad (warm)
- * - Octaves: 2, 3, 4, 5, 6 (full range for pitch training)
+ * - Octaves: 1, 2, 3, 4, 5, 6 (extended range for pitch training)
  * - High-quality soundfont samples from MusyngKite
  * - Constant volume across all notes
  */
@@ -164,16 +164,16 @@ export class AudioEngine {
   /**
    * Play a note with specified octave and timbre
    * @param note - Musical note (C-B chromatic)
-   * @param octave - Octave (2, 3, 4, 5, or 6)
+   * @param octave - Octave (1, 2, 3, 4, 5, or 6)
    * @param timbre - Timbre (piano or sine)
-   * @param duration - Duration in seconds (default 4)
+ * @param durationMs - Duration in milliseconds
    * @returns Promise resolving when playback scheduled
    */
   async playNote(
     note: ChromaticNote,
     octave: Octave,
     timbre: Timbre,
-    duration: number = 4
+    durationMs: number = 2500
   ): Promise<void> {
     await this.ensureInstrumentsLoaded();
 
@@ -205,9 +205,10 @@ export class AudioEngine {
 
       // Play the note for the specified duration
       await instrument.play(midiNote, this.audioContext.currentTime, {
-        duration: duration,
+        duration: durationMs / 1000,
         gain: 1.0, // Full volume for clear pitch perception
       });
+
     } catch (error) {
       // Ignore abort errors
       if (error instanceof Error && error.name === 'AbortError') {
@@ -222,9 +223,10 @@ export class AudioEngine {
    * Stop all currently playing notes
    */
   stopAll(): void {
-    // Soundfont doesn't expose easy note stopping
-    // Notes will stop naturally when duration expires
-    console.warn('stopAll() is not fully supported with soundfont-player');
+    if (this.currentNoteController) {
+      this.currentNoteController.abort();
+      this.currentNoteController = null;
+    }
   }
 
   /**
@@ -232,7 +234,7 @@ export class AudioEngine {
    */
   async testAudio(): Promise<void> {
     console.log('Testing audio with A4 (440 Hz)...');
-    await this.playNote('A', 4, 'piano', 2);
+    await this.playNote('A', 4, 'piano', 2000);
   }
 
   /**
@@ -276,7 +278,7 @@ export async function testAllNotes(octave: Octave = 4): Promise<void> {
 
   for (const note of CHROMATIC_NOTES) {
     console.log(`Playing ${note}${octave}`);
-    await engine.playNote(note, octave, 'piano', 2);
+    await engine.playNote(note, octave, 'piano', 2000);
     // Small delay between notes to avoid overlap
     await new Promise(resolve => setTimeout(resolve, 2200));
   }

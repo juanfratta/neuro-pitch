@@ -19,7 +19,6 @@ import { ProtocolStateMachine } from '../state/machine';
 import { PROTOCOL_CONFIG, getNotesForLevel } from '../protocol/config';
 import {
   createTrainingRandomizer,
-  createTestRandomizer,
 } from '../utils/randomization';
 
 interface ProtocolContextType {
@@ -56,6 +55,11 @@ interface ProtocolContextType {
 }
 
 const ProtocolContext = createContext<ProtocolContextType | undefined>(undefined);
+const RETENTION_UNLOCK_SESSIONS = {
+  2: 15,
+  4: 30,
+  8: 45,
+} as const;
 
 /**
  * Provider component for protocol context
@@ -105,13 +109,14 @@ export const ProtocolProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Add trial to current session
   const addTrialToSession = useCallback((trial: Trial) => {
-    if (!currentSession) return;
-
-    setCurrentSession({
-      ...currentSession,
-      trials: [...currentSession.trials, trial],
+    setCurrentSession((session) => {
+      if (!session) return session;
+      return {
+        ...session,
+        trials: [...session.trials, trial],
+      };
     });
-  }, [currentSession]);
+  }, []);
 
   // Submit response to a trial
   const submitSessionResponse = useCallback(
@@ -125,17 +130,15 @@ export const ProtocolProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           ...session,
           trials: session.trials.map((trial) => {
             if (trial.id === trialId) {
+              const isTimeout = response.toUpperCase() === 'NONE' || reactionTimeMs >= PROTOCOL_CONFIG.trialTimeout;
+              const isCorrect = !isTimeout && response.toUpperCase() === trial.note;
+
               return {
                 ...trial,
                 user_response: response as any,
-                correct: response.toUpperCase() === trial.note,
+                correct: isCorrect,
                 reaction_time_ms: reactionTimeMs,
-                feedback:
-                  response.toUpperCase() === trial.note
-                    ? reactionTimeMs > PROTOCOL_CONFIG.trialTimeout * 0.8
-                      ? 'slow'
-                      : 'correct'
-                    : 'incorrect',
+                feedback: isTimeout ? 'slow' : isCorrect ? 'correct' : 'incorrect',
               };
             }
             return trial;
@@ -185,15 +188,24 @@ export const ProtocolProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const startRetentionTest = useCallback(
     async (week: number) => {
       if (!user || !stateMachine) return;
-
-      createTestRandomizer();
+      const totalSessions = user.training_history.session_count;
+      const requiredSessions = RETENTION_UNLOCK_SESSIONS[week as keyof typeof RETENTION_UNLOCK_SESSIONS];
+      if (requiredSessions && totalSessions < requiredSessions) {
+        return;
+      }
 
       const test = createRetentionTest(week);
       // Cast to Session for UI purposes (they share same trial structure)
       setCurrentSession(test as any);
 
       stateMachine.setUser(user);
-      stateMachine.transition(week === 2 ? 'take_week2_test' : 'take_week4_test');
+      if (week === 2) {
+        stateMachine.transition('take_week2_test');
+      } else if (week === 4) {
+        stateMachine.transition('take_week4_test');
+      } else {
+        stateMachine.transition('take_final_test');
+      }
       setProtocolState(stateMachine.getState());
     },
     [user, stateMachine]
