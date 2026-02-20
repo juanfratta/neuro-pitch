@@ -43,6 +43,7 @@ export const useAudioTrial = (audioEngine: AudioEngine): UseAudioTrialReturn => 
   const responseStartTimeRef = useRef<number | null>(null);
   const feedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const responseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Initialize on mount - cleanup timeouts on unmount
   useEffect(() => {
@@ -51,6 +52,7 @@ export const useAudioTrial = (audioEngine: AudioEngine): UseAudioTrialReturn => 
     return () => {
       if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
       if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+      if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
     };
   }, []);
 
@@ -61,19 +63,26 @@ export const useAudioTrial = (audioEngine: AudioEngine): UseAudioTrialReturn => 
 
       currentTrialRef.current = params;
       setFeedback(null);
-      responseStartTimeRef.current = Date.now();
-      setTrialState('waiting_response');
+      setTrialState('playing');
+
+      const noteDurationMs = params.durationMs ?? PROTOCOL_CONFIG.audio.noteDuration;
 
       void audioEngine
         .playNote(
           params.note,
           params.octave,
           params.timbre,
-          params.durationMs ?? PROTOCOL_CONFIG.audio.noteDuration
+          noteDurationMs
         )
         .catch((err) => {
           console.error('Error playing note:', err);
         });
+
+      if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
+      playbackTimeoutRef.current = setTimeout(() => {
+        responseStartTimeRef.current = Date.now();
+        setTrialState('waiting_response');
+      }, noteDurationMs);
     },
     [isReady, audioEngine]
   );
@@ -117,6 +126,7 @@ export const useAudioTrial = (audioEngine: AudioEngine): UseAudioTrialReturn => 
       }
 
       if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+      if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
       audioEngine.stopAll();
 
       const reactionTime = Date.now() - responseStartTimeRef.current;
