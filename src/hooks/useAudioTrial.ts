@@ -19,6 +19,7 @@ export interface TrialParams {
   note: ChromaticNote;
   octave: Octave;
   timbre: Timbre;
+  durationMs?: number;
 }
 
 export type TrialState = 'idle' | 'playing' | 'waiting_response' | 'feedback';
@@ -64,7 +65,12 @@ export const useAudioTrial = (audioEngine: AudioEngine): UseAudioTrialReturn => 
       setTrialState('waiting_response');
 
       void audioEngine
-        .playNote(params.note, params.octave, params.timbre, PROTOCOL_CONFIG.audio.noteDuration)
+        .playNote(
+          params.note,
+          params.octave,
+          params.timbre,
+          params.durationMs ?? PROTOCOL_CONFIG.audio.noteDuration
+        )
         .catch((err) => {
           console.error('Error playing note:', err);
         });
