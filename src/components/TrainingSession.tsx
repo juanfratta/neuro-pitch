@@ -42,6 +42,9 @@ export const TrainingSession: React.FC = () => {
       : 0;
   const displayedTrialNumber = currentTrialData?.trialObject?.trial_number ?? Math.min(trials.length + 1, PROTOCOL_CONFIG.trialsPerSession);
   const progressPercent = Math.min(100, Math.round((trials.length / PROTOCOL_CONFIG.trialsPerSession) * 100));
+  const isSelectorEnabled =
+    (trialState === 'playing' || trialState === 'waiting_response') &&
+    selectedNote === null;
 
   useEffect(() => {
     if (!user || !currentSession) return;
@@ -139,7 +142,7 @@ export const TrainingSession: React.FC = () => {
   };
 
   const handleNoteClick = (note: string) => {
-    if (trialState !== 'waiting_response' || selectedNote) return;
+    if ((trialState !== 'playing' && trialState !== 'waiting_response') || selectedNote) return;
     setSelectedNote(note);
 
     const { reactionTime } = submitResponse(note);
@@ -196,9 +199,17 @@ export const TrainingSession: React.FC = () => {
         {trialState === 'feedback' && feedback && currentTrialData && <TrialFeedback feedback={feedback} correctNote={currentTrialData.note} />}
       </div>
 
-      {trialState === 'waiting_response' && (
-        <NoteSelector availableNotes={levelNotes} onSelect={handleNoteClick} disabled={selectedNote !== null} selectedNote={selectedNote} />
-      )}
+      <div>
+        <NoteSelector
+          availableNotes={levelNotes}
+          onSelect={handleNoteClick}
+          disabled={!isSelectorEnabled}
+          selectedNote={selectedNote}
+        />
+        <p className="mt-2 text-center text-[11px] text-slate-500 dark:text-slate-400">
+          {isSelectorEnabled ? 'Responder ahora' : 'Esperando siguiente nota'}
+        </p>
+      </div>
 
       <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
         Sin cantar ni tararear. Solo escucha y responde.
