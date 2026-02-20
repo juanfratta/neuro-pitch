@@ -12,6 +12,50 @@ const STORAGE_KEY_USER = 'neuro_pitch_user_v1';
 const STORAGE_KEY_SESSIONS = 'neuro_pitch_sessions_v1';
 const STORAGE_KEY_TESTS = 'neuro_pitch_tests_v1';
 
+function normalizeUserData(rawUser: any, userId: string): User {
+  const baseUser = initializeUser(rawUser?.id || userId);
+  const source = rawUser && typeof rawUser === 'object' ? rawUser : {};
+  const sourceProficiency =
+    source.proficiency_map && typeof source.proficiency_map === 'object'
+      ? source.proficiency_map
+      : {};
+  const mergedProficiency = { ...baseUser.proficiency_map };
+
+  CHROMATIC_NOTES.forEach((note) => {
+    const src = sourceProficiency[note] || {};
+    mergedProficiency[note] = {
+      note,
+      accuracy: typeof src.accuracy === 'number' ? src.accuracy : 0,
+      rt_avg: typeof src.rt_avg === 'number' ? src.rt_avg : 0,
+      rt_min: typeof src.rt_min === 'number' ? src.rt_min : Infinity,
+      rt_max: typeof src.rt_max === 'number' ? src.rt_max : 0,
+      trial_count: typeof src.trial_count === 'number' ? src.trial_count : 0,
+      last_updated:
+        typeof src.last_updated === 'string'
+          ? src.last_updated
+          : new Date().toISOString(),
+    };
+  });
+
+  return {
+    ...baseUser,
+    ...source,
+    protocol_version: 'wong-2025-v1',
+    sessions: Array.isArray(source.sessions) ? source.sessions : [],
+    retention_tests: Array.isArray(source.retention_tests)
+      ? source.retention_tests
+      : [],
+    proficiency_map: mergedProficiency,
+    mode: source.mode === 'research' ? 'research' : 'user',
+    training_history: {
+      ...baseUser.training_history,
+      ...(source.training_history && typeof source.training_history === 'object'
+        ? source.training_history
+        : {}),
+    },
+  };
+}
+
 /**
  * Initialize a new user with level 1
  */
@@ -64,7 +108,11 @@ export function loadOrCreateUser(userId: string): User {
         console.warn('Protocol version mismatch; creating new user');
         return initializeUser(userId);
       }
-      return user;
+
+      const normalized = normalizeUserData(user, userId);
+      // Persist normalized structure to keep backward compatibility stable
+      saveUser(normalized);
+      return normalized;
     }
   } catch (err) {
     console.error('Failed to load user from localStorage:', err);

@@ -11,6 +11,9 @@ import { TrialFeedback } from './TrialFeedback';
 import { TrialPlayback } from './TrialPlayback';
 import { SessionSummary } from './SessionSummary';
 
+const TRAINING_NOTE_DURATION_MS = 1500;
+const INTER_TRIAL_SILENCE_MS = 1500;
+
 export const TrainingSession: React.FC = () => {
   const { user, currentSession, submitSessionResponse, addTrialToSession, completeCurrentSession } = useProtocol();
   const audioEngine = getAudioEngine();
@@ -24,6 +27,7 @@ export const TrainingSession: React.FC = () => {
   const hasStartedRef = useRef(false);
   const randomizerRef = useRef<RandomizationEngine | null>(null);
   const summaryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const interTrialTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playedTrialKeyRef = useRef<string | null>(null);
   const trialsCountRef = useRef(0);
   const isFinishingSessionRef = useRef(false);
@@ -49,6 +53,7 @@ export const TrainingSession: React.FC = () => {
 
     return () => {
       if (summaryTimeoutRef.current) clearTimeout(summaryTimeoutRef.current);
+      if (interTrialTimeoutRef.current) clearTimeout(interTrialTimeoutRef.current);
     };
   }, [user?.id, currentSession?.id]);
 
@@ -63,7 +68,10 @@ export const TrainingSession: React.FC = () => {
 
     if (hasStartedRef.current && trialState === 'idle') {
       setSelectedNote(null);
-      playNextTrial();
+      if (interTrialTimeoutRef.current) clearTimeout(interTrialTimeoutRef.current);
+      interTrialTimeoutRef.current = setTimeout(() => {
+        playNextTrial();
+      }, INTER_TRIAL_SILENCE_MS);
     }
   }, [isReady, trialState, isSessionComplete]);
 
@@ -83,6 +91,7 @@ export const TrainingSession: React.FC = () => {
     if (!isSessionComplete) return;
     if (trialState !== 'idle') return;
     audioEngine.stopAll();
+    if (interTrialTimeoutRef.current) clearTimeout(interTrialTimeoutRef.current);
     setShowSummary(true);
 
     if (summaryTimeoutRef.current) clearTimeout(summaryTimeoutRef.current);
@@ -125,6 +134,7 @@ export const TrainingSession: React.FC = () => {
       note: trial.note,
       octave: trial.octave,
       timbre: trial.timbre,
+      durationMs: TRAINING_NOTE_DURATION_MS,
     });
   };
 

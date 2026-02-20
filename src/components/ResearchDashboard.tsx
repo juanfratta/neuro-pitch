@@ -13,6 +13,7 @@
 
 import React, { useState } from "react";
 import { useProtocol } from "../state/protocol-context";
+import type { NoteProficiency } from "../types";
 import "../styles/ResearchDashboard.css";
 
 export const ResearchDashboard: React.FC = () => {
@@ -27,7 +28,16 @@ export const ResearchDashboard: React.FC = () => {
   const errorDistribution: { [note: string]: number } = {};
   const rtByNote: { [note: string]: number[] } = {};
 
-  user.sessions.forEach((session) => {
+  const sessions = Array.isArray(user.sessions) ? user.sessions : [];
+  const retentionTests = Array.isArray(user.retention_tests)
+    ? user.retention_tests
+    : [];
+  const proficiencyMap =
+    user.proficiency_map && typeof user.proficiency_map === "object"
+      ? user.proficiency_map
+      : {};
+
+  sessions.forEach((session) => {
     session.trials.forEach((trial) => {
       if (!errorDistribution[trial.note]) {
         errorDistribution[trial.note] = 0;
@@ -46,7 +56,7 @@ export const ResearchDashboard: React.FC = () => {
   });
 
   // Calculate retention test outcomes
-  const retentionResults = user.retention_tests.map((test) => ({
+  const retentionResults = retentionTests.map((test) => ({
     week: test.week,
     accuracy: test.accuracy,
     rtAvg: test.rt_avg,
@@ -54,12 +64,16 @@ export const ResearchDashboard: React.FC = () => {
   }));
 
   // Learning curve data
-  const learningCurve = user.sessions.map((session, idx) => ({
+  const learningCurve = sessions.map((session, idx) => ({
     sessionNumber: idx + 1,
     level: session.level,
     accuracy: session.accuracy,
     rtAvg: session.rt_avg,
   }));
+  const maxErrors = Math.max(
+    1,
+    ...Object.values(errorDistribution).filter((v) => Number.isFinite(v))
+  );
 
   const handleExport = () => {
     const data = exportData(exportFormat);
@@ -107,7 +121,7 @@ export const ResearchDashboard: React.FC = () => {
       <section className="stats-grid">
         <div className="stat-box">
           <h3>Sesiones completadas</h3>
-          <div className="value">{user.sessions.length}</div>
+          <div className="value">{sessions.length}</div>
         </div>
         <div className="stat-box">
           <h3>Trials totales</h3>
@@ -120,8 +134,7 @@ export const ResearchDashboard: React.FC = () => {
         <div className="stat-box">
           <h3>Tests de retención pasados</h3>
           <div className="value">
-            {user.retention_tests.filter((t) => t.passed).length}/
-            {user.retention_tests.length}
+            {retentionTests.filter((t) => t.passed).length}/{retentionTests.length}
           </div>
         </div>
       </section>
@@ -141,7 +154,8 @@ export const ResearchDashboard: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {Object.entries(user.proficiency_map).map(([note, prof]) => (
+            {(Object.entries(proficiencyMap) as [string, NoteProficiency][]).map(
+              ([note, prof]) => (
               <tr key={note}>
                 <td className="note-cell">{note}</td>
                 <td
@@ -162,7 +176,8 @@ export const ResearchDashboard: React.FC = () => {
                 <td>{prof.rt_max}</td>
                 <td>{prof.trial_count}</td>
               </tr>
-            ))}
+              )
+            )}
           </tbody>
         </table>
       </section>
@@ -180,12 +195,7 @@ export const ResearchDashboard: React.FC = () => {
                   <div
                     className="bar"
                     style={{
-                      width: `${Math.max(
-                        (errors /
-                          Math.max(...Object.values(errorDistribution))) *
-                          100,
-                        5,
-                      )}%`,
+                      width: `${Math.max((errors / maxErrors) * 100, 5)}%`,
                     }}
                   >
                     {errors > 0 && (
@@ -251,9 +261,9 @@ export const ResearchDashboard: React.FC = () => {
       <section className="raw-data-section">
         <h2>Datos de Sesiones (últimas 5)</h2>
         <div className="raw-data-list">
-          {user.sessions.slice(-5).map((session, idx) => (
+          {sessions.slice(-5).map((session, idx) => (
             <div key={session.id} className="session-card">
-              <h4>Sesión {user.sessions.length - 5 + idx + 1}</h4>
+              <h4>Sesión {sessions.length - 5 + idx + 1}</h4>
               <p>Nivel: {session.level}</p>
               <p>Precisión: {session.accuracy.toFixed(1)}%</p>
               <p>RT Promedio: {session.rt_avg.toFixed(0)}ms</p>
