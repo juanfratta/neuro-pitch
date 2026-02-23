@@ -7,10 +7,21 @@
 import type { User, Session, Trial, RetentionTest, NoteProficiency, ChromaticNote } from '../types';
 import { CHROMATIC_NOTES } from '../types';
 import { PROTOCOL_CONFIG } from '../protocol/config';
+import { getUserStorageKeyByMode } from '../utils/app-mode';
+import { getProtocolVariant } from '../utils/protocol-variant';
 
 const STORAGE_KEY_USER = 'neuro_pitch_user_v1';
 const STORAGE_KEY_SESSIONS = 'neuro_pitch_sessions_v1';
 const STORAGE_KEY_TESTS = 'neuro_pitch_tests_v1';
+
+function getScopedStorageKey(baseKey: string): string {
+  return `${getUserStorageKeyByMode(baseKey)}_${getProtocolVariant()}`;
+}
+
+function createRandomAnchorNote(): ChromaticNote {
+  const index = Math.floor(Math.random() * CHROMATIC_NOTES.length);
+  return CHROMATIC_NOTES[index];
+}
 
 function normalizeUserData(rawUser: any, userId: string): User {
   const baseUser = initializeUser(rawUser?.id || userId);
@@ -41,6 +52,11 @@ function normalizeUserData(rawUser: any, userId: string): User {
     ...baseUser,
     ...source,
     protocol_version: 'wong-2025-v1',
+    protocol_variant:
+      source.protocol_variant === 'v1' || source.protocol_variant === 'v2'
+        ? source.protocol_variant
+        : getProtocolVariant(),
+    anchor_note: CHROMATIC_NOTES.includes(source.anchor_note) ? source.anchor_note : createRandomAnchorNote(),
     sessions: Array.isArray(source.sessions) ? source.sessions : [],
     retention_tests: Array.isArray(source.retention_tests)
       ? source.retention_tests
@@ -78,7 +94,9 @@ export function initializeUser(userId: string): User {
   const user: User = {
     id: userId,
     protocol_version: 'wong-2025-v1',
+    protocol_variant: getProtocolVariant(),
     created_at: new Date().toISOString(),
+    anchor_note: createRandomAnchorNote(),
     current_level: 1, // Start at level 1
     sessions: [],
     retention_tests: [],
@@ -100,7 +118,8 @@ export function initializeUser(userId: string): User {
  */
 export function loadOrCreateUser(userId: string): User {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY_USER);
+    const scopedKey = getScopedStorageKey(STORAGE_KEY_USER);
+    const stored = localStorage.getItem(scopedKey);
     if (stored) {
       const user = JSON.parse(stored);
       // Validate protocol version
@@ -112,6 +131,15 @@ export function loadOrCreateUser(userId: string): User {
       const normalized = normalizeUserData(user, userId);
       // Persist normalized structure to keep backward compatibility stable
       saveUser(normalized);
+      return normalized;
+    }
+
+    // Backward compatibility: migrate legacy unscoped profile if present
+    const legacyStored = localStorage.getItem(STORAGE_KEY_USER);
+    if (legacyStored) {
+      const legacyUser = JSON.parse(legacyStored);
+      const normalized = normalizeUserData(legacyUser, userId);
+      localStorage.setItem(scopedKey, JSON.stringify(normalized));
       return normalized;
     }
   } catch (err) {
@@ -126,7 +154,7 @@ export function loadOrCreateUser(userId: string): User {
  */
 export function saveUser(user: User): void {
   try {
-    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+    localStorage.setItem(getScopedStorageKey(STORAGE_KEY_USER), JSON.stringify(user));
   } catch (err) {
     console.error('Failed to save user to localStorage:', err);
     // In production, could queue for backup save or warn user

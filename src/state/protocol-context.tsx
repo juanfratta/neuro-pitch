@@ -16,10 +16,16 @@ import {
   completeRetentionTest,
 } from '../services/storage';
 import { ProtocolStateMachine } from '../state/machine';
-import { PROTOCOL_CONFIG, getNotesForLevel } from '../protocol/config';
+import {
+  PROTOCOL_CONFIG,
+  getNotesForLevelWithAnchor,
+  getRetentionUnlockSessions,
+  isWeeklyRetentionEnabled,
+} from '../protocol/config';
 import {
   createTrainingRandomizer,
 } from '../utils/randomization';
+import { getProtocolVariant } from '../utils/protocol-variant';
 
 interface ProtocolContextType {
   // User data
@@ -55,12 +61,6 @@ interface ProtocolContextType {
 }
 
 const ProtocolContext = createContext<ProtocolContextType | undefined>(undefined);
-const RETENTION_UNLOCK_SESSIONS = {
-  2: 15,
-  4: 30,
-  8: 45,
-} as const;
-
 /**
  * Provider component for protocol context
  */
@@ -88,7 +88,11 @@ export const ProtocolProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const startSession = useCallback(async () => {
     if (!user || !stateMachine) return;
 
-    const notes = getNotesForLevel(user.current_level);
+    const notes = getNotesForLevelWithAnchor(
+      user.current_level,
+      user.anchor_note,
+      user.protocol_variant
+    );
     createTrainingRandomizer(user.current_level, notes);
 
     const session = {
@@ -188,8 +192,15 @@ export const ProtocolProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const startRetentionTest = useCallback(
     async (week: number) => {
       if (!user || !stateMachine) return;
+      const variant = getProtocolVariant();
+      if (!isWeeklyRetentionEnabled(variant) && week !== 8) {
+        return;
+      }
+
       const totalSessions = user.training_history.session_count;
-      const requiredSessions = RETENTION_UNLOCK_SESSIONS[week as keyof typeof RETENTION_UNLOCK_SESSIONS];
+      const unlocks = getRetentionUnlockSessions(variant);
+      const requiredSessions =
+        week === 2 ? unlocks.week2 : week === 4 ? unlocks.week4 : unlocks.final;
       if (requiredSessions && totalSessions < requiredSessions) {
         return;
       }

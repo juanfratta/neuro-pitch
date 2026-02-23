@@ -87,7 +87,9 @@ export interface NoteProficiency {
 export interface User {
   id: string;
   protocol_version: 'wong-2025-v1';
+  protocol_variant: 'v1' | 'v2';
   created_at: string;
+  anchor_note: ChromaticNote;
   current_level: number; // 1-10
   sessions: Session[];
   retention_tests: RetentionTest[];

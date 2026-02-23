@@ -1,15 +1,21 @@
 import React from 'react';
 import { useProtocol } from '../state/protocol-context';
-import { PROTOCOL_CONFIG } from '../protocol/config';
+import { getNotesForLevelWithAnchor, PROTOCOL_CONFIG } from '../protocol/config';
+import { getAppMode } from '../utils/app-mode';
 
 export const ProgressDashboard: React.FC = () => {
   const { user, consecutiveSuccessfulSessions, protocolState } = useProtocol();
+  const isParticipantMode = getAppMode() === 'participant';
 
   if (!user) {
     return <div className="text-sm text-slate-500 dark:text-slate-400">Cargando progreso...</div>;
   }
 
-  const currentLevelNotes = PROTOCOL_CONFIG.levelNoteSet[user.current_level - 1] || [];
+  const currentLevelNotes = getNotesForLevelWithAnchor(
+    user.current_level,
+    user.anchor_note,
+    user.protocol_variant
+  );
   const rtThreshold = PROTOCOL_CONFIG.rtThresholds[user.current_level - 1] || 0;
   const minAccuracy = PROTOCOL_CONFIG.minAccuracy;
   const sessionsRequired = PROTOCOL_CONFIG.sessionsRequiredForAdvance;
@@ -36,10 +42,21 @@ export const ProgressDashboard: React.FC = () => {
       <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Tu progreso</p>
         <div className="mt-2 flex items-end justify-between">
-          <h2 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">{user.current_level}</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">de 10</p>
+          {isParticipantMode ? (
+            <>
+              <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Entrenamiento activo</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">sin pistas</p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">{user.current_level}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">de 10</p>
+            </>
+          )}
         </div>
-        <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">Notas activas: {currentLevelNotes.join(' · ')}</p>
+        {!isParticipantMode && (
+          <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">Notas activas: {currentLevelNotes.join(' · ')}</p>
+        )}
       </section>
 
       <section className="space-y-3">

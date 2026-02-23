@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getAudioEngine } from '../audio/engine';
 import { createTrial } from '../services/storage';
-import { getNotesForLevel, PROTOCOL_CONFIG } from '../protocol/config';
+import { CHROMATIC_NOTES, getNotesForLevelWithAnchor, PROTOCOL_CONFIG } from '../protocol/config';
 import { useProtocol } from '../state/protocol-context';
 import { useAudioTrial } from '../hooks/useAudioTrial';
 import { useSessionProgression } from '../hooks/useSessionProgression';
@@ -10,6 +10,7 @@ import { NoteSelector } from './TrialNoteSelector';
 import { TrialFeedback } from './TrialFeedback';
 import { TrialPlayback } from './TrialPlayback';
 import { SessionSummary } from './SessionSummary';
+import { getAppMode } from '../utils/app-mode';
 
 const TRAINING_NOTE_DURATION_MS = 1500;
 const INTER_TRIAL_SILENCE_MS = 1500;
@@ -18,7 +19,18 @@ export const TrainingSession: React.FC = () => {
   const { user, currentSession, submitSessionResponse, addTrialToSession, completeCurrentSession } = useProtocol();
   const audioEngine = getAudioEngine();
   const { trialState, feedback, playTrial, submitResponse, isReady } = useAudioTrial(audioEngine);
-  const { trials, addTrial } = useSessionProgression(PROTOCOL_CONFIG.trialsPerSession);
+  const sessionTrialCount = useMemo(() => {
+    if (typeof window === 'undefined') return PROTOCOL_CONFIG.trialsPerSession;
+    const trialsParam = new URLSearchParams(window.location.search).get('trials');
+    const parsed = Number(trialsParam);
+
+    if (!Number.isFinite(parsed)) return PROTOCOL_CONFIG.trialsPerSession;
+    const normalized = Math.floor(parsed);
+    if (normalized < 1) return PROTOCOL_CONFIG.trialsPerSession;
+
+    return Math.min(normalized, 200);
+  }, []);
+  const { trials, addTrial } = useSessionProgression(sessionTrialCount);
 
   const [selectedNote, setSelectedNote] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(false);
@@ -31,28 +43,34 @@ export const TrainingSession: React.FC = () => {
   const playedTrialKeyRef = useRef<string | null>(null);
   const trialsCountRef = useRef(0);
   const isFinishingSessionRef = useRef(false);
+  const submittedTrialIdsRef = useRef<Set<string>>(new Set());
 
-  const levelNotes = getNotesForLevel(user?.current_level || 1);
+  const responseOptions = CHROMATIC_NOTES;
   const respondedTrialsCount =
     currentSession?.trials.filter((trial) => trial.user_response !== null).length ?? 0;
-  const isSessionComplete = respondedTrialsCount >= PROTOCOL_CONFIG.trialsPerSession;
+  const isSessionComplete = respondedTrialsCount >= sessionTrialCount;
   const sessionScore =
     currentSession && currentSession.trials.length > 0
       ? (currentSession.trials.filter((trial) => trial.correct === true).length / currentSession.trials.length) * 100
       : 0;
-  const displayedTrialNumber = currentTrialData?.trialObject?.trial_number ?? Math.min(trials.length + 1, PROTOCOL_CONFIG.trialsPerSession);
-  const progressPercent = Math.min(100, Math.round((trials.length / PROTOCOL_CONFIG.trialsPerSession) * 100));
+  const displayedTrialNumber = currentTrialData?.trialObject?.trial_number ?? Math.min(trials.length + 1, sessionTrialCount);
+  const progressPercent = Math.min(100, Math.round((trials.length / sessionTrialCount) * 100));
   const isSelectorEnabled =
-    (trialState === 'playing' || trialState === 'waiting_response') &&
+    trialState === 'waiting_response' &&
     selectedNote === null;
+  const isParticipantMode = getAppMode() === 'participant';
 
   useEffect(() => {
     if (!user || !currentSession) return;
 
-    randomizerRef.current = createTrainingRandomizer(user.current_level, getNotesForLevel(user.current_level));
+    randomizerRef.current = createTrainingRandomizer(
+      user.current_level,
+      getNotesForLevelWithAnchor(user.current_level, user.anchor_note, user.protocol_variant)
+    );
     hasStartedRef.current = false;
     playedTrialKeyRef.current = null;
     isFinishingSessionRef.current = false;
+    submittedTrialIdsRef.current = new Set();
 
     return () => {
       if (summaryTimeoutRef.current) clearTimeout(summaryTimeoutRef.current);
@@ -84,9 +102,12 @@ export const TrainingSession: React.FC = () => {
     if (trialState !== 'feedback' || selectedNote !== null) return;
 
     const trialId = currentTrialData.trialObject.id;
+    if (submittedTrialIdsRef.current.has(trialId)) return;
+
     const alreadySubmitted = currentSession?.trials.find((trial) => trial.id === trialId)?.user_response !== null;
     if (alreadySubmitted) return;
 
+    submittedTrialIdsRef.current.add(trialId);
     submitSessionResponse(trialId, 'NONE', PROTOCOL_CONFIG.trialTimeout);
   }, [trialState, selectedNote, currentTrialData, currentSession, submitSessionResponse]);
 
@@ -114,7 +135,7 @@ export const TrainingSession: React.FC = () => {
   const playNextTrial = async () => {
     if (!randomizerRef.current || showSummary || isSessionComplete || isFinishingSessionRef.current) return;
     const nextTrialNumber = trialsCountRef.current + 1;
-    if (nextTrialNumber > PROTOCOL_CONFIG.trialsPerSession) return;
+    if (nextTrialNumber > sessionTrialCount) return;
 
     const trialKey = `${currentSession?.id}-${nextTrialNumber}`;
     if (playedTrialKeyRef.current === trialKey) return;
@@ -147,7 +168,8 @@ export const TrainingSession: React.FC = () => {
 
     const { reactionTime } = submitResponse(note);
     if (currentTrialData?.trialObject) {
-      if (currentTrialData.trialObject.trial_number >= PROTOCOL_CONFIG.trialsPerSession) {
+      submittedTrialIdsRef.current.add(currentTrialData.trialObject.id);
+      if (currentTrialData.trialObject.trial_number >= sessionTrialCount) {
         isFinishingSessionRef.current = true;
       }
       submitSessionResponse(currentTrialData.trialObject.id, note, reactionTime);
@@ -172,10 +194,12 @@ export const TrainingSession: React.FC = () => {
         <div className="flex items-end justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Sesión activa</p>
-            <p className="text-lg font-semibold text-slate-900 dark:text-white">Nivel {user.current_level}</p>
+            <p className="text-lg font-semibold text-slate-900 dark:text-white">
+              {isParticipantMode ? 'Entrenamiento en curso' : `Nivel ${user.current_level}`}
+            </p>
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            {displayedTrialNumber} / {PROTOCOL_CONFIG.trialsPerSession}
+            {displayedTrialNumber} / {sessionTrialCount}
           </p>
         </div>
 
@@ -201,7 +225,7 @@ export const TrainingSession: React.FC = () => {
 
       <div>
         <NoteSelector
-          availableNotes={levelNotes}
+          availableNotes={responseOptions}
           onSelect={handleNoteClick}
           disabled={!isSelectorEnabled}
           selectedNote={selectedNote}

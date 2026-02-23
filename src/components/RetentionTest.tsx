@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useProtocol } from '../state/protocol-context';
 import { getAudioEngine } from '../audio/engine';
 import { RandomizationEngine } from '../utils/randomization';
-import { CHROMATIC_NOTES, getNotesForLevel, PROTOCOL_CONFIG, RETENTION_TEST_TRIALS } from '../protocol/config';
+import { CHROMATIC_NOTES, getNotesForLevelWithAnchor, PROTOCOL_CONFIG, RETENTION_TEST_TRIALS } from '../protocol/config';
 import { createTrial } from '../services/storage';
 
 interface RetentionTestProps {
@@ -28,7 +28,14 @@ export const RetentionTest: React.FC<RetentionTestProps> = ({ week, onTestComple
   const trialResultsRef = useRef<Array<{ correct: boolean; reactionTime: number }>>([]);
   const playedTrialKeyRef = useRef<string | null>(null);
 
-  const notePool = week === 8 ? CHROMATIC_NOTES : getNotesForLevel(user?.current_level || 1);
+  const notePool =
+    week === 8
+      ? CHROMATIC_NOTES
+      : getNotesForLevelWithAnchor(
+          user?.current_level || 1,
+          user?.anchor_note || 'F',
+          user?.protocol_variant || 'v2'
+        );
   const totalTrials = week === 2 ? RETENTION_TEST_TRIALS.week2 : week === 4 ? RETENTION_TEST_TRIALS.week4 : RETENTION_TEST_TRIALS.final;
   const [trialNumber, setTrialNumber] = useState(1);
   const [status, setStatus] = useState<TestStatus>('playing');
