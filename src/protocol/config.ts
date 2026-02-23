@@ -1,192 +1,207 @@
 /**
- * Protocol Configuration for Wong 2025
- * Curriculum, thresholds, and scientific parameters
- * Do NOT modify criteria or reduce requirements
+ * Protocol Configuration for Wong 2025 variants
+ * v1: original app behavior (2-note start + weekly tests)
+ * v2: strict-like behavior (1-note start + no weekly tests)
  */
 
 import type { ProtocolConfig, ChromaticNote } from '../types';
+import { CHROMATIC_NOTES } from '../types';
+import { getProtocolVariant, type ProtocolVariant } from '../utils/protocol-variant';
 
 export { CHROMATIC_NOTES } from '../types';
 
-/**
- * Level-by-level curriculum
- * Each level adds ONE note after achieving 90% accuracy
- * Starting with 2 non-canonical notes (D#/Eb, F#/Gb) to avoid bias
- * User must reach 90%+ accuracy to unlock next note
- */
-const LEVEL_NOTE_SETS: ChromaticNote[][] = [
-  // Level 1: 2 notes (D#/Eb, F#/Gb)
+const TOTAL_LEVELS = 10;
+
+const V1_LEVEL_NOTE_SETS: ChromaticNote[][] = [
   ['D#', 'F#'],
-  
-  // Level 2: 3 notes (add B)
   ['D#', 'F#', 'B'],
-  
-  // Level 3: 4 notes (add G)
   ['D#', 'F#', 'B', 'G'],
-  
-  // Level 4: 5 notes (add E)
-  ['D#', 'E', 'F#', 'B', 'G'],
-  
-  // Level 5: 6 notes (add C#)
-  ['B', 'C#', 'D#', 'E', 'F#', 'G'],
-  
-  // Level 6: 7 notes (add A)
-  ['A', 'B', 'C#', 'D#', 'E', 'F#', 'G'],
-  
-  // Level 7: 8 notes (add G#)
-  ['A', 'B', 'C#', 'D#', 'E', 'F#', 'G', 'G#'],
-  
-  // Level 8: 9 notes (add A#)
-  ['A', 'A#', 'B', 'C#', 'D#', 'E', 'F#', 'G', 'G#'],
-  
-  // Level 9: 10 notes (add C)
-  ['A', 'A#', 'B', 'C', 'C#', 'D#', 'E', 'F#', 'G', 'G#'],
-  
-  // Level 10: 11 notes (add D)
-  ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F#', 'G', 'G#'],
+  ['D#', 'F#', 'B', 'G', 'C#'],
+  ['D#', 'F#', 'B', 'G', 'C#', 'A'],
+  ['D#', 'F#', 'B', 'G', 'C#', 'A', 'E'],
+  ['D#', 'F#', 'B', 'G', 'C#', 'A', 'E', 'C'],
+  ['D#', 'F#', 'B', 'G', 'C#', 'A', 'E', 'C', 'F'],
+  ['D#', 'F#', 'B', 'G', 'C#', 'A', 'E', 'C', 'F', 'A#'],
+  CHROMATIC_NOTES,
 ];
 
-/**
- * Reaction time thresholds per level (milliseconds)
- * User's average RT must be <= this value to advance
- * Progressively tighter constraints enforce faster, automatic responding
- */
+function getChromaticIndex(note: ChromaticNote): number {
+  const index = CHROMATIC_NOTES.indexOf(note);
+  if (index < 0) {
+    throw new Error(`Invalid note in chromatic scale: ${note}`);
+  }
+  return index;
+}
+
+function wrapChromaticIndex(index: number): number {
+  return ((index % CHROMATIC_NOTES.length) + CHROMATIC_NOTES.length) % CHROMATIC_NOTES.length;
+}
+
+function buildAnchoredNoteSet(level: number, anchorNote: ChromaticNote): ChromaticNote[] {
+  if (level < 1 || level > TOTAL_LEVELS) {
+    throw new Error(`Invalid level: ${level}. Must be 1-${TOTAL_LEVELS}.`);
+  }
+
+  const anchorIndex = getChromaticIndex(anchorNote);
+  const offsets: number[] = [0];
+
+  for (let step = 1; offsets.length < level; step++) {
+    offsets.push(-step);
+    if (offsets.length < level) {
+      offsets.push(step);
+    }
+  }
+
+  const notes = offsets.map((offset) => CHROMATIC_NOTES[wrapChromaticIndex(anchorIndex + offset)]);
+  return [...notes].sort((a, b) => getChromaticIndex(a) - getChromaticIndex(b));
+}
+
+const V2_REFERENCE_LEVEL_NOTE_SETS: ChromaticNote[][] = Array.from(
+  { length: TOTAL_LEVELS },
+  (_, index) => buildAnchoredNoteSet(index + 1, 'F')
+);
+
 const RT_THRESHOLDS: number[] = [
-  2500, // Level 1: 2.5 seconds max
-  2300, // Level 2
-  2100, // Level 3
-  1900, // Level 4
-  1700, // Level 5
-  1500, // Level 6: 1.5 seconds
-  1300, // Level 7
-  1100, // Level 8
-  900,  // Level 9
-  700,  // Level 10: 700ms max (must be fast and automatic)
+  2500,
+  2300,
+  2100,
+  1900,
+  1700,
+  1500,
+  1300,
+  1100,
+  900,
+  700,
 ];
 
-/**
- * Core protocol configuration
- * Scientific parameters - DO NOT MODIFY
- */
+function getLevelNoteSetsForVariant(variant: ProtocolVariant): ChromaticNote[][] {
+  return variant === 'v1' ? V1_LEVEL_NOTE_SETS : V2_REFERENCE_LEVEL_NOTE_SETS;
+}
+
+export function isWeeklyRetentionEnabled(variant: ProtocolVariant = getProtocolVariant()): boolean {
+  return variant === 'v1';
+}
+
+export function getRetentionUnlockSessions(variant: ProtocolVariant = getProtocolVariant()): {
+  week2: number | null;
+  week4: number | null;
+  final: number;
+} {
+  if (variant === 'v1') {
+    return {
+      week2: 15,
+      week4: 30,
+      final: 45,
+    };
+  }
+
+  return {
+    week2: null,
+    week4: null,
+    final: 45,
+  };
+}
+
+const activeVariant = getProtocolVariant();
+
 export const PROTOCOL_CONFIG: ProtocolConfig = {
   version: 'wong-2025-v1',
-  
-  levelNoteSet: LEVEL_NOTE_SETS,
+  levelNoteSet: getLevelNoteSetsForVariant(activeVariant),
   rtThresholds: RT_THRESHOLDS,
-  
-  // Scientific criterion: minimum 90% accuracy to advance
   minAccuracy: 90,
-  
-  // Criterion must be sustained across 3 consecutive sessions
   sessionsRequiredForAdvance: 3,
-  
-  // Trial timeout: must respond within 5 seconds (hard limit)
   trialTimeout: 5000,
-  
-  // Trials per training session
   trialsPerSession: 30,
-  
-  // Audio engine parameters
   audio: {
-    noteDuration: 2500, // 2.5 seconds (note is played this long)
-    a4_frequency: 440, // A4 = 440 Hz
-    volume: 0.7, // Consistent volume
+    noteDuration: 2500,
+    a4_frequency: 440,
+    volume: 0.7,
   },
 };
 
-/**
- * Retention test schedule (in days from start)
- * Post-training evaluation without feedback
- */
 export const RETENTION_TEST_SCHEDULE = {
-  week2: 14,  // Day 14
-  week4: 28,  // Day 28
-  final: null, // Manual trigger or after all levels complete
+  week2: 14,
+  week4: 28,
+  final: null,
 };
 
-/**
- * Retention test length (trial count)
- * Week tests are shorter checkpoints; final mirrors paper-scale evaluation.
- */
 export const RETENTION_TEST_TRIALS = {
   week2: 24,
   week4: 48,
   final: 144,
 } as const;
 
-/**
- * Anti-relative-pitch controls
- * Applied during training AND testing to prevent relational listening
- */
 export const ANTI_RELATIVE_PITCH_RULES = {
-  prohibitConsecutiveRepeat: true, // Can't play same note twice in a row
-  prohibitABA: true, // Can't have A-B-A pattern
-  prohibitABCBA: true, // Can't have reversal patterns
-  octaveMixing: true, // Training and tests mix the global OCTAVES range
-  minOctavaGapInTests: 1, // Minimum gap > 1 octave between notes in tests
-  randomSeed: true, // Every trial uses explicit seed
-  includeOutOfSetTrials: 0.1, // 10% of trials use notes outside current set (detection)
+  prohibitConsecutiveRepeat: true,
+  prohibitABA: true,
+  prohibitABCBA: true,
+  octaveMixing: true,
+  minOctavaGapInTests: 1,
+  randomSeed: true,
+  includeOutOfSetTrials: 0.1,
   instructionText: 'Do not sing, hum, or use reference instruments. Listen only to the isolated note.',
 };
 
-/**
- * Helper function: Get note set for a given level (1-10)
- */
 export function getNotesForLevel(level: number): ChromaticNote[] {
-  if (level < 1 || level > 10) {
-    throw new Error(`Invalid level: ${level}. Must be 1-10.`);
-  }
-  return LEVEL_NOTE_SETS[level - 1];
+  return getNotesForLevelWithAnchor(level, 'F', getProtocolVariant());
 }
 
-/**
- * Helper function: Get RT threshold for a given level
- */
+export function getNotesForLevelWithAnchor(
+  level: number,
+  anchorNote: ChromaticNote,
+  variant: ProtocolVariant = getProtocolVariant()
+): ChromaticNote[] {
+  if (level < 1 || level > TOTAL_LEVELS) {
+    throw new Error(`Invalid level: ${level}. Must be 1-${TOTAL_LEVELS}.`);
+  }
+
+  if (variant === 'v1') {
+    return V1_LEVEL_NOTE_SETS[level - 1];
+  }
+
+  return buildAnchoredNoteSet(level, anchorNote);
+}
+
 export function getRTThresholdForLevel(level: number): number {
-  if (level < 1 || level > 10) {
-    throw new Error(`Invalid level: ${level}. Must be 1-10.`);
+  if (level < 1 || level > TOTAL_LEVELS) {
+    throw new Error(`Invalid level: ${level}. Must be 1-${TOTAL_LEVELS}.`);
   }
   return RT_THRESHOLDS[level - 1];
 }
 
-/**
- * Validation: ensure config is immutable at runtime
- */
 export const validateProtocolIntegrity = (): boolean => {
-  // Ensure all levels 1-10 present
-  if (LEVEL_NOTE_SETS.length !== 10) {
-    console.error('Protocol error: Missing levels in curriculum');
-    return false;
-  }
-  if (RT_THRESHOLDS.length !== 10) {
+  if (RT_THRESHOLDS.length !== TOTAL_LEVELS) {
     console.error('Protocol error: Missing RT thresholds');
     return false;
   }
-  
-  // Ensure accuracy threshold is non-negotiable 90%
+
   if (PROTOCOL_CONFIG.minAccuracy !== 90) {
     console.error('Protocol violation: minAccuracy must be exactly 90%');
     return false;
   }
-  
-  // Ensure advance requirement is 3 consecutive sessions
+
   if (PROTOCOL_CONFIG.sessionsRequiredForAdvance !== 3) {
     console.error('Protocol violation: must require 3 consecutive sessions for advance');
     return false;
   }
-  
-  // Ensure gradual level progression (each level adds at least one note)
-  for (let i = 1; i < LEVEL_NOTE_SETS.length; i++) {
-    if (LEVEL_NOTE_SETS[i].length <= LEVEL_NOTE_SETS[i - 1].length) {
+
+  const levelNoteSets = getLevelNoteSetsForVariant(activeVariant);
+  if (levelNoteSets.length !== TOTAL_LEVELS) {
+    console.error('Protocol error: Missing levels in curriculum');
+    return false;
+  }
+
+  for (let i = 1; i < levelNoteSets.length; i++) {
+    if (levelNoteSets[i].length <= levelNoteSets[i - 1].length) {
       console.error(`Protocol error: Level ${i + 1} does not increase note count`);
       return false;
     }
   }
-  
+
   return true;
 };
 
-// Validate protocol at import time
 if (!validateProtocolIntegrity()) {
   throw new Error('Protocol configuration is invalid. See console errors.');
 }
+

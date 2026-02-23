@@ -4,6 +4,9 @@ import { TrainingSession } from './TrainingSession';
 import { RetentionTest } from './RetentionTest';
 import { ProgressDashboard } from './ProgressDashboard';
 import { ResearchDashboard } from './ResearchDashboard';
+import { getAppMode, setAppMode, type AppMode } from '../utils/app-mode';
+import { getProtocolVariant, setProtocolVariant, type ProtocolVariant } from '../utils/protocol-variant';
+import { getRetentionUnlockSessions, isWeeklyRetentionEnabled } from '../protocol/config';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -25,11 +28,34 @@ export const ProtocolGate: React.FC = () => {
     isResearchMode,
   } = useProtocol();
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+  const [appMode, setAppModeState] = useState<AppMode>(getAppMode);
+  const [protocolVariant, setProtocolVariantState] = useState<ProtocolVariant>(getProtocolVariant);
+  const isParticipantMode = appMode === 'participant';
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('neuro_pitch_theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (isParticipantMode && isResearchMode) {
+      setResearchMode(false);
+    }
+  }, [isParticipantMode, isResearchMode, setResearchMode]);
+
+  const handleModeChange = (mode: AppMode) => {
+    if (mode === appMode) return;
+    setAppMode(mode);
+    setAppModeState(mode);
+    window.location.reload();
+  };
+
+  const handleProtocolVariantChange = (variant: ProtocolVariant) => {
+    if (variant === protocolVariant) return;
+    setProtocolVariant(variant);
+    setProtocolVariantState(variant);
+    window.location.reload();
+  };
 
   if (isLoading || !user) {
     return (
@@ -43,9 +69,11 @@ export const ProtocolGate: React.FC = () => {
   }
 
   const completedSessions = user.training_history.session_count;
-  const canTakeWeek2 = completedSessions >= 15;
-  const canTakeWeek4 = completedSessions >= 30;
-  const canTakeFinal = completedSessions >= 45;
+  const weeklyEnabled = isWeeklyRetentionEnabled(protocolVariant);
+  const retentionUnlocks = getRetentionUnlockSessions(protocolVariant);
+  const canTakeWeek2 = retentionUnlocks.week2 !== null && completedSessions >= retentionUnlocks.week2;
+  const canTakeWeek4 = retentionUnlocks.week4 !== null && completedSessions >= retentionUnlocks.week4;
+  const canTakeFinal = completedSessions >= retentionUnlocks.final;
 
   const isActiveSession = ['training_session_active', 'week2_retention_test', 'week4_retention_test', 'final_test'].includes(protocolState);
 
@@ -70,26 +98,30 @@ export const ProtocolGate: React.FC = () => {
                   Empezar sesión
                 </button>
 
-                <button
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                  onClick={() => startRetentionTest(2)}
-                  disabled={!canTakeWeek2}
-                >
-                  Prueba semana 2 {canTakeWeek2 ? '' : `(faltan ${15 - completedSessions})`}
-                </button>
-                <button
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                  onClick={() => startRetentionTest(4)}
-                  disabled={!canTakeWeek4}
-                >
-                  Prueba semana 4 {canTakeWeek4 ? '' : `(faltan ${30 - completedSessions})`}
-                </button>
+                {weeklyEnabled && (
+                  <>
+                    <button
+                      className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                      onClick={() => startRetentionTest(2)}
+                      disabled={!canTakeWeek2}
+                    >
+                      Prueba semana 2 {canTakeWeek2 ? '' : `(faltan ${(retentionUnlocks.week2 || 0) - completedSessions})`}
+                    </button>
+                    <button
+                      className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                      onClick={() => startRetentionTest(4)}
+                      disabled={!canTakeWeek4}
+                    >
+                      Prueba semana 4 {canTakeWeek4 ? '' : `(faltan ${(retentionUnlocks.week4 || 0) - completedSessions})`}
+                    </button>
+                  </>
+                )}
                 <button
                   className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
                   onClick={() => startRetentionTest(8)}
                   disabled={!canTakeFinal}
                 >
-                  Prueba final {canTakeFinal ? '(repetible)' : `(faltan ${45 - completedSessions})`}
+                  Prueba final {canTakeFinal ? '(repetible)' : `(faltan ${retentionUnlocks.final - completedSessions})`}
                 </button>
               </div>
             </div>
@@ -98,15 +130,41 @@ export const ProtocolGate: React.FC = () => {
               <p className="inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 dark:border-cyan-900/60 dark:bg-cyan-950/40 dark:text-cyan-300">
                 Protocolo Wong 2025
               </p>
-              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500"
-                  checked={isResearchMode}
-                  onChange={(e) => setResearchMode(e.target.checked)}
-                />
-                Modo investigación
-              </label>
+              <div className="flex items-center gap-2">
+                <div className="inline-flex overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700">
+                  <button
+                    className={`px-2.5 py-1.5 text-xs font-semibold transition ${
+                      appMode === 'participant'
+                        ? 'bg-cyan-500 text-slate-950 dark:bg-cyan-400'
+                        : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                    }`}
+                    onClick={() => handleModeChange('participant')}
+                  >
+                    Participante
+                  </button>
+                  <button
+                    className={`px-2.5 py-1.5 text-xs font-semibold transition ${
+                      appMode === 'developer'
+                        ? 'bg-cyan-500 text-slate-950 dark:bg-cyan-400'
+                        : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                    }`}
+                    onClick={() => handleModeChange('developer')}
+                  >
+                    Developer
+                  </button>
+                </div>
+                {!isParticipantMode && (
+                  <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-slate-300 text-cyan-500 focus:ring-cyan-500"
+                      checked={isResearchMode}
+                      onChange={(e) => setResearchMode(e.target.checked)}
+                    />
+                    Modo investigación
+                  </label>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -150,14 +208,40 @@ export const ProtocolGate: React.FC = () => {
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3">
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Absolute Pitch Trainer</p>
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">Nivel {user.current_level}/10</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+              {isParticipantMode ? `Modo participante · ${protocolVariant}` : `Nivel ${user.current_level}/10 · ${protocolVariant}`}
+            </p>
           </div>
-          <button
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
-            onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
-          >
-            {theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="inline-flex overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700">
+              <button
+                className={`px-2.5 py-1.5 text-xs font-semibold transition ${
+                  protocolVariant === 'v1'
+                    ? 'bg-emerald-500 text-slate-950 dark:bg-emerald-400'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                }`}
+                onClick={() => handleProtocolVariantChange('v1')}
+              >
+                Protocolo v1
+              </button>
+              <button
+                className={`px-2.5 py-1.5 text-xs font-semibold transition ${
+                  protocolVariant === 'v2'
+                    ? 'bg-emerald-500 text-slate-950 dark:bg-emerald-400'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                }`}
+                onClick={() => handleProtocolVariantChange('v2')}
+              >
+                Protocolo v2
+              </button>
+            </div>
+            <button
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+              onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+            >
+              {theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -168,7 +252,7 @@ export const ProtocolGate: React.FC = () => {
 
         {!isActiveSession && (
           <aside className="h-fit rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/85">
-            {isResearchMode ? <ResearchDashboard /> : <ProgressDashboard />}
+            {!isParticipantMode && isResearchMode ? <ResearchDashboard /> : <ProgressDashboard />}
           </aside>
         )}
       </main>
