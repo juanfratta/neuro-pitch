@@ -16,7 +16,7 @@
 
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { CHROMAS, displayNote, type Chroma } from '../protocol/notes';
+import { CHROMAS, noteParts, type Chroma } from '../protocol/notes';
 
 const RADIUS = 2.1;
 const RISE = 1.5; // altura por octava
@@ -89,8 +89,12 @@ function isDarkTheme(): boolean {
   return document.documentElement.classList.contains('dark');
 }
 
-/** Etiqueta en dos líneas: el nombre grande y, si hay, el acierto chico debajo. Angosta para no pisarse. */
-function labelSprite(name: string, detail: string | null, color: string): THREE.Sprite {
+/**
+ * Etiqueta angosta para no pisarse: el nombre grande, el enarmónico chico (en las
+ * teclas negras) y el acierto debajo.
+ */
+function labelSprite(chroma: Chroma, detail: string | null, color: string): THREE.Sprite {
+  const { main, alt } = noteParts(chroma);
   const canvas = document.createElement('canvas');
   canvas.width = 160;
   canvas.height = 160;
@@ -98,13 +102,19 @@ function labelSprite(name: string, detail: string | null, color: string): THREE.
   ctx.fillStyle = color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '600 72px Fraunces, Georgia, serif';
-  ctx.fillText(name, 80, detail ? 56 : 80);
-  if (detail) {
-    ctx.globalAlpha = 0.75;
-    ctx.font = '500 40px "Plus Jakarta Sans", system-ui, sans-serif';
-    ctx.fillText(detail, 80, 122);
-  }
+  const lines: { text: string; font: string; alpha: number }[] = [
+    { text: main, font: `600 ${alt ? 60 : 72}px Fraunces, Georgia, serif`, alpha: 1 },
+  ];
+  if (alt) lines.push({ text: alt, font: '600 34px Fraunces, Georgia, serif', alpha: 0.8 });
+  if (detail) lines.push({ text: detail, font: '500 34px "Plus Jakarta Sans", system-ui, sans-serif', alpha: 0.75 });
+  const heights = lines.map((_, i) => (i === 0 ? (alt ? 60 : 72) : 36));
+  let y = 80 - heights.reduce((a, b) => a + b, 0) / 2;
+  lines.forEach((line, i) => {
+    ctx.globalAlpha = line.alpha;
+    ctx.font = line.font;
+    ctx.fillText(line.text, 80, y + heights[i] / 2);
+    y += heights[i];
+  });
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, depthTest: false }));
@@ -183,7 +193,7 @@ function buildMap(group: THREE.Group, palette: Palette, learned: Chroma[], next:
       column.position.set(bottom.x, (top.y + bottom.y) / 2, bottom.z);
       group.add(column);
 
-      const label = labelSprite(displayNote(chroma), isLearned && acc !== undefined ? `${Math.round(acc)}%` : null, palette.text);
+      const label = labelSprite(chroma, isLearned && acc !== undefined ? `${Math.round(acc)}%` : null, palette.text);
       const theta = (c / 12) * Math.PI * 2;
       label.position.set(LABEL_RADIUS * Math.sin(theta), top.y + 0.35, LABEL_RADIUS * Math.cos(theta));
       label.userData.isLabel = true;

@@ -211,7 +211,7 @@ export function TrainingFlow({ onExit, devMode }: { onExit: () => void; devMode:
           <p className="font-display text-2xl font-semibold">Ejercicio sobre {displayNote(step.target)}</p>
           <p className="text-[15px] leading-relaxed">
             Es la nota que más te está costando. Vas a escuchar tonos sueltos: si suena {displayNote(step.target)}, tocá{' '}
-            {displayNote(step.target)}; si no, tocá el anillo de afuera. Primero {SPECIAL_EXERCISE_FEEDBACK_TRIALS} notas con
+            {displayNote(step.target)}; si no, tocá el centro (fuera de rango). Primero {SPECIAL_EXERCISE_FEEDBACK_TRIALS} notas con
             feedback y después {SPECIAL_EXERCISE_NO_FEEDBACK_TRIALS} sin feedback.
           </p>
           <Button variant="accent" onClick={() => { setAttemptStart(new Date()); setStep({ name: 'special-running', target: step.target, phase: 'feedback' }); }}>

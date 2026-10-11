@@ -9,7 +9,7 @@ Cada parámetro de `src/protocol/params.ts` está marcado con su origen:
 | Aspecto | Paper | Implementación | Origen |
 | --- | --- | --- | --- |
 | Orden de notas | F y vecinas alternando abajo y arriba | Igual (`introductionOrder`) | PAPER |
-| Fuera de rango | ±1 y ±2 semitonos de los bordes del set, con botón propio | Igual (`outOfBoundSet`) | PAPER |
+| Fuera de rango | ±1 y ±2 semitonos de los bordes del set, con botón propio | Igual (`outOfBoundSet`). El botón es el centro de la rueda mientras suena la nota: queda donde estaba el cursor al tocar Escuchar y a igual distancia de todas las notas | PAPER + PROPIO |
 | Proporción de fuera de rango | No informada | Al menos 50% de trials con notas aprendidas, y para pasar también hay que alcanzar el mínimo en esas | PROPIO |
 | Niveles | 24 por nota, 288 en total, 20% a 90%, primero con feedback | 1-8 con feedback 20-90% (ventana x1,5); 9-12 con feedback 90% achicando la ventana; 13-20 sin feedback 20-90%; 21-24 sin feedback 90% | RECONSTRUIDO |
 | Ventana final por etapa | OSM Table 1: 1183, 1242, 1305, 1371, 1440, 1513, 1589, 1668, 1751, 1839, 1930, 2028 ms | Igual | PAPER |

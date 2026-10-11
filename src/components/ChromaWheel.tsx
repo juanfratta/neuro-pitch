@@ -1,31 +1,28 @@
 /**
  * Rueda cromática: las 12 notas en círculo, como el croma que se entrena.
  *
+ * El centro cumple dos funciones: antes de cada trial es "Escuchar" y, mientras suena
+ * la nota, es "Fuera de rango". Así, después de tocar Escuchar el cursor o el dedo ya
+ * está sobre fuera de rango, y todas las notas quedan a la misma distancia.
+ *
  * Reglas que la rueda respeta (ver AGENTS.md):
  * - Nada en pantalla depende de la nota que suena antes de responder. El pulso al
  *   sonar es idéntico para las 12 notas.
  * - En niveles sin feedback no se revela nada: ni color ni arco.
- * - Todas las opciones quedan a la misma distancia del centro.
  */
 
 import { motion, useReducedMotion } from 'motion/react';
-import { CHROMAS, OUT_OF_BOUND, chromaIndex, displayNote, type Answer, type Chroma } from '../protocol/notes';
+import { CHROMAS, OUT_OF_BOUND, chromaIndex, displayNote, noteParts, type Answer, type Chroma } from '../protocol/notes';
 import type { TrialRecord } from '../protocol/progression';
 import type { TrialPhase } from '../hooks/useTrialRunner';
 
-const SIZE = 420;
-const C = SIZE / 2;
+const C = 210;
+const VIEW = 176; // medio lado del viewBox
 const NOTE_RADIUS = 142;
-const NOTE_SIZE = 27;
+const NOTE_SIZE = 28;
 const TIMER_RADIUS = 100;
-const CENTER_RADIUS = 78;
-const RING_INNER = 178;
-const RING_OUTER = 204;
-/** Línea base del texto del anillo: centrado en la banda. */
-const RING_LABEL = (RING_INNER + RING_OUTER) / 2 - 4;
-const LOCKED_LABEL_RADIUS = 120;
-/** En la mitad de abajo el texto queda hacia adentro de la línea base. */
-const RING_LABEL_BOTTOM = (RING_INNER + RING_OUTER) / 2 + 4;
+const CENTER_RADIUS = 80;
+const LOCKED_LABEL_RADIUS = 118;
 
 /** Colores por tema: definidos como variables en index.css (.dark cambia la paleta). */
 const COLORS = {
@@ -41,7 +38,8 @@ const COLORS = {
   coral: 'var(--np-coral)',
   lavender: 'var(--np-lavender)',
 };
-const FILL_TRANSITION = 'fill 200ms ease, stroke 200ms ease, stroke-opacity 200ms ease';
+const FILL_TRANSITION = 'fill 200ms ease, stroke 200ms ease';
+const SERIF = '"Fraunces", Georgia, serif';
 
 function polar(index: number, radius: number) {
   const angle = ((index * 30 - 90) * Math.PI) / 180;
@@ -57,12 +55,6 @@ function arcPath(from: number, to: number, radius: number): string {
   return `M ${a.x} ${a.y} A ${radius} ${radius} 0 0 ${sweep} ${b.x} ${b.y}`;
 }
 
-function ringPath(): string {
-  // anillo completo como dos semicírculos (para que sea clickeable como un solo trazo)
-  const r = (RING_INNER + RING_OUTER) / 2;
-  return `M ${C - r} ${C} A ${r} ${r} 0 1 1 ${C + r} ${C} A ${r} ${r} 0 1 1 ${C - r} ${C}`;
-}
-
 interface Props {
   options: Answer[];
   phase: TrialPhase;
@@ -72,18 +64,40 @@ interface Props {
   lastRecord: TrialRecord | null;
   onListen: () => void;
   onAnswer: (answer: Answer) => void;
-  /** Vista estática para explicar cómo responder: sin interacción ni texto en el centro. */
+  /** Vista estática para explicar cómo responder: sin interacción. */
   preview?: boolean;
 }
 
 type NoteState = 'idle' | 'active' | 'locked' | 'correct' | 'wrong' | 'reveal';
+
+/** Nombre de la nota en el círculo: sostenido grande y bemol chico debajo. */
+function NoteLabel({ note, x, y, size, color, compact = false }: { note: Chroma; x: number; y: number; size: number; color: string; compact?: boolean }) {
+  const { main, alt } = noteParts(note);
+  if (!alt || compact) {
+    return (
+      <text x={x} y={y} dy="0.35em" textAnchor="middle" fontSize={size} className="pointer-events-none" style={{ fontFamily: SERIF, fontWeight: 600, fill: color }}>
+        {main}
+      </text>
+    );
+  }
+  return (
+    <text x={x} y={y} textAnchor="middle" className="pointer-events-none" style={{ fontFamily: SERIF, fontWeight: 600, fill: color }}>
+      <tspan x={x} dy={-size * 0.08} fontSize={size * 0.8}>
+        {main}
+      </tspan>
+      <tspan x={x} dy={size * 0.72} fontSize={size * 0.52} style={{ opacity: 0.8 }}>
+        {alt}
+      </tspan>
+    </text>
+  );
+}
 
 export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, lastRecord, onListen, onAnswer, preview = false }: Props) {
   const reduceMotion = useReducedMotion();
   const answering = phase === 'playing' && !preview;
   const lit = answering || preview;
   const hasOutOfBound = options.includes(OUT_OF_BOUND);
-  const showFeedback = phase === 'feedback' && feedback && lastRecord !== null;
+  const showFeedback = phase === 'feedback' && feedback && lastRecord !== null && !preview;
 
   const expected = lastRecord?.stimulus.expected ?? null;
   const answered = lastRecord?.answer ?? null;
@@ -100,39 +114,44 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
     return lit ? 'active' : 'idle';
   };
 
-  const ringState: NoteState = showFeedback
-    ? expected === OUT_OF_BOUND
-      ? 'correct'
-      : answered === OUT_OF_BOUND
-        ? 'wrong'
-        : answering
-          ? 'active'
-          : 'idle'
-    : lit
-      ? 'active'
-      : 'idle';
-
   // Arco de error: de la respuesta a la nota que sonó, solo con feedback y respuesta con nombre.
   const arc =
     showFeedback && !lastRecord!.correct && answered && answered !== OUT_OF_BOUND && heard
       ? arcPath(chromaIndex(answered), chromaIndex(heard), NOTE_RADIUS)
       : null;
 
-  const timerLength = 2 * Math.PI * TIMER_RADIUS;
+  // Qué es el centro en cada momento
+  type CenterMode = 'listen' | 'out' | 'idle' | 'result';
+  const centerMode: CenterMode =
+    preview ? (hasOutOfBound ? 'out' : 'idle')
+    : phase === 'ready' ? 'listen'
+    : answering && hasOutOfBound ? 'out'
+    : phase === 'feedback' ? 'result'
+    : 'idle';
+  const centerClickable = !preview && (centerMode === 'listen' || (centerMode === 'out' && answering));
 
-  const centerLabel = (() => {
-    if (preview) return '';
-    if (phase === 'ready') return 'Escuchar';
-    if (phase === 'loading') return '';
-    if (phase === 'playing') return '';
-    if (phase === 'feedback' && lastRecord) {
-      if (!feedback) return lastRecord.answer === null ? 'Sin respuesta' : 'Registrado';
-      if (lastRecord.correct) return 'Correcto';
-      if (lastRecord.answer === null) return 'Tiempo';
-      return expected === OUT_OF_BOUND ? `Sonó ${displayNote(heard ?? '')}` : `Era ${displayNote(expected ?? '')}`;
-    }
-    return '';
+  const resultText = (() => {
+    if (!lastRecord || phase !== 'feedback') return '';
+    if (!feedback) return lastRecord.answer === null ? 'Sin respuesta' : 'Registrado';
+    if (lastRecord.correct) return 'Correcto';
+    if (lastRecord.answer === null) return 'Tiempo';
+    return expected === OUT_OF_BOUND ? `Sonó ${displayNote(heard ?? '')}` : `Era ${displayNote(expected ?? '')}`;
   })();
+
+  const outRight = showFeedback && expected === OUT_OF_BOUND && lastRecord!.correct;
+  const outWrong = showFeedback && answered === OUT_OF_BOUND && !lastRecord!.correct;
+  const centerFill =
+    centerMode === 'listen' ? COLORS.brass
+    : centerMode === 'out' ? COLORS.lavender
+    : outRight ? COLORS.mint
+    : outWrong ? COLORS.coral
+    : COLORS.center;
+  const centerTextColor =
+    centerMode === 'listen' || centerMode === 'out' || outRight || outWrong ? COLORS.onAccent
+    : showFeedback ? (lastRecord!.correct ? COLORS.mint : COLORS.coral)
+    : COLORS.mist;
+
+  const timerLength = 2 * Math.PI * TIMER_RADIUS;
 
   const keyActivate = (fn: () => void) => (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -141,10 +160,16 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
     }
   };
 
+  const onCenter = () => {
+    if (preview) return;
+    if (centerMode === 'listen') onListen();
+    else if (centerMode === 'out' && answering) onAnswer(OUT_OF_BOUND);
+  };
+
   return (
     <svg
-      viewBox={hasOutOfBound ? `0 0 ${SIZE} ${SIZE}` : `${C - 176} ${C - 176} 352 352`}
-      className="mx-auto block w-full max-w-[440px] select-none"
+      viewBox={`${C - VIEW} ${C - VIEW} ${VIEW * 2} ${VIEW * 2}`}
+      className="mx-auto block w-full max-w-[420px] select-none"
       role={preview ? 'img' : 'group'}
       aria-label={preview ? 'Ejemplo de la rueda de respuestas' : 'Rueda de notas'}
     >
@@ -154,48 +179,9 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
           <stop offset="70%" stopColor={COLORS.room} stopOpacity="0.4" />
           <stop offset="100%" stopColor={COLORS.room} stopOpacity="0" />
         </radialGradient>
-        <path id="ring-label-path" d={`M ${C - RING_LABEL} ${C} A ${RING_LABEL} ${RING_LABEL} 0 0 1 ${C + RING_LABEL} ${C}`} />
-        <path id="ring-label-path-bottom" d={`M ${C - RING_LABEL_BOTTOM} ${C} A ${RING_LABEL_BOTTOM} ${RING_LABEL_BOTTOM} 0 0 0 ${C + RING_LABEL_BOTTOM} ${C}`} />
       </defs>
 
-      <circle cx={C} cy={C} r={RING_INNER - 4} fill="url(#wheel-glow)" />
-
-      {/* Anillo fuera de rango */}
-      {hasOutOfBound && (
-        <g
-          role={preview ? undefined : 'button'}
-          aria-label={preview ? undefined : 'Fuera de rango'}
-          aria-disabled={!answering}
-          tabIndex={answering ? 0 : -1}
-          onClick={() => answering && onAnswer(OUT_OF_BOUND)}
-          onKeyDown={keyActivate(() => answering && onAnswer(OUT_OF_BOUND))}
-          className={answering ? 'cursor-pointer outline-none' : 'outline-none'}
-        >
-          <path
-            d={ringPath()}
-            fill="none"
-            strokeWidth={RING_OUTER - RING_INNER}
-            style={{
-              stroke: ringState === 'correct' ? COLORS.mint : ringState === 'wrong' ? COLORS.coral : COLORS.lavender,
-              strokeOpacity: ringState === 'active' ? 0.4 : ringState === 'idle' ? 0.16 : 0.85,
-              transition: reduceMotion ? undefined : FILL_TRANSITION,
-            }}
-          />
-          {(['ring-label-path', 'ring-label-path-bottom'] as const).map((id) => (
-            <text
-              key={id}
-              fontSize="11"
-              letterSpacing="3"
-              className="pointer-events-none"
-              style={{ fontWeight: 600, fill: ringState === 'idle' ? COLORS.faint : ringState === 'active' ? COLORS.mist : COLORS.onAccent }}
-            >
-              <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">
-                fuera de rango
-              </textPath>
-            </text>
-          ))}
-        </g>
-      )}
+      <circle cx={C} cy={C} r={VIEW - 2} fill="url(#wheel-glow)" />
 
       {/* Guía circular de las notas */}
       <circle cx={C} cy={C} r={NOTE_RADIUS} fill="none" style={{ stroke: COLORS.faint }} strokeOpacity={0.45} strokeWidth={1} />
@@ -220,7 +206,8 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
         const { x, y } = polar(i, NOTE_RADIUS);
         const label = polar(i, LOCKED_LABEL_RADIUS);
         const state = noteState(note);
-        const clickable = state === 'active';
+        const clickable = state === 'active' && answering;
+        const isOption = options.includes(note) && !preview;
         const fill =
           state === 'correct' ? COLORS.mint
           : state === 'wrong' ? COLORS.coral
@@ -237,13 +224,13 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
         return (
           <g
             key={note}
-            role={options.includes(note) && !preview ? 'button' : undefined}
-            aria-label={options.includes(note) && !preview ? note : undefined}
-            aria-disabled={options.includes(note) && !preview ? !clickable : undefined}
+            role={isOption ? 'button' : undefined}
+            aria-label={isOption ? note : undefined}
+            aria-disabled={isOption ? !clickable : undefined}
             tabIndex={clickable ? 0 : -1}
             onClick={() => clickable && onAnswer(note)}
             onKeyDown={keyActivate(() => clickable && onAnswer(note))}
-            className={clickable ? 'cursor-pointer outline-none [&:focus-visible>circle]:stroke-white' : 'outline-none'}
+            className={clickable ? 'cursor-pointer outline-none [&:focus-visible>g>circle]:stroke-white' : 'outline-none'}
           >
             <motion.g
               whileHover={clickable && !reduceMotion ? { scale: 1.08 } : undefined}
@@ -263,24 +250,18 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
                 }}
               />
             </motion.g>
-            <text
-              x={isLockedDot ? label.x : x}
-              y={isLockedDot ? label.y : y}
-              dy="0.35em"
-              textAnchor="middle"
-              fontSize={isLockedDot ? 11 : 20}
-              className="pointer-events-none"
-              style={{ fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600, fill: textColor }}
-            >
-              {displayNote(note)}
-            </text>
+            {isLockedDot ? (
+              <NoteLabel note={note} x={label.x} y={label.y} size={12} color={COLORS.faint} compact />
+            ) : (
+              <NoteLabel note={note} x={x} y={y} size={21} color={textColor} />
+            )}
           </g>
         );
       })}
 
       {/* Temporizador: se vacía durante la ventana de respuesta */}
       <circle cx={C} cy={C} r={TIMER_RADIUS} fill="none" style={{ stroke: COLORS.faint }} strokeOpacity={0.4} strokeWidth={3} />
-      {phase === 'playing' && (
+      {phase === 'playing' && !preview && (
         <motion.circle
           key={`timer-${trialIndex}`}
           cx={C}
@@ -299,7 +280,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
       )}
 
       {/* Pulso al sonar: igual para todas las notas */}
-      {phase === 'playing' && !reduceMotion && (
+      {phase === 'playing' && !preview && !reduceMotion && (
         <motion.circle
           key={`pulse-${trialIndex}`}
           cx={C}
@@ -309,22 +290,23 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
           style={{ stroke: COLORS.brass }}
           strokeWidth={2}
           initial={{ r: CENTER_RADIUS, opacity: 0.7 }}
-          animate={{ r: TIMER_RADIUS + 26, opacity: 0 }}
+          animate={{ r: TIMER_RADIUS + 24, opacity: 0 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
         />
       )}
 
-      {/* Centro */}
+      {/* Centro: Escuchar, o Fuera de rango mientras suena */}
       <g
-        role={phase === 'ready' && !preview ? 'button' : undefined}
-        aria-label={phase === 'ready' && !preview ? 'Escuchar' : undefined}
-        tabIndex={phase === 'ready' && !preview ? 0 : -1}
-        onClick={() => phase === 'ready' && !preview && onListen()}
-        onKeyDown={keyActivate(() => phase === 'ready' && !preview && onListen())}
-        className={phase === 'ready' && !preview ? 'cursor-pointer outline-none' : 'outline-none'}
+        role={centerClickable ? 'button' : undefined}
+        aria-label={centerClickable ? (centerMode === 'listen' ? 'Escuchar' : 'Fuera de rango') : undefined}
+        tabIndex={centerClickable ? 0 : -1}
+        onClick={onCenter}
+        onKeyDown={keyActivate(onCenter)}
+        className={centerClickable ? 'cursor-pointer outline-none' : 'outline-none'}
       >
         <motion.g
-          whileHover={phase === 'ready' && !reduceMotion ? { scale: 1.04 } : undefined}
+          whileHover={centerClickable && !reduceMotion ? { scale: 1.04 } : undefined}
+          whileTap={centerClickable && !reduceMotion ? { scale: 0.97 } : undefined}
           style={{ transformOrigin: `${C}px ${C}px` }}
         >
           <circle
@@ -333,13 +315,13 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
             r={CENTER_RADIUS}
             strokeWidth={2}
             style={{
-              fill: phase === 'ready' && !preview ? COLORS.brass : COLORS.center,
-              stroke: phase === 'ready' && !preview ? COLORS.brass : COLORS.faint,
+              fill: centerFill,
+              stroke: centerMode === 'idle' || centerMode === 'result' ? COLORS.faint : 'transparent',
               transition: reduceMotion ? undefined : FILL_TRANSITION,
             }}
           />
         </motion.g>
-        {phase === 'loading' && (
+        {phase === 'loading' && !preview && (
           <motion.circle
             cx={C}
             cy={C}
@@ -352,23 +334,27 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
             style={{ transformOrigin: `${C}px ${C}px`, stroke: COLORS.mist }}
           />
         )}
-        <text
-          x={C}
-          y={C}
-          dy="0.35em"
-          textAnchor="middle"
-          fontSize={centerLabel.length > 10 ? 15 : 19}
-          className="pointer-events-none"
-          style={{
-            fontFamily: '"Fraunces", Georgia, serif',
-            fontWeight: 600,
-            fill:
-              phase === 'ready' ? COLORS.onAccent
-              : showFeedback ? (lastRecord!.correct ? COLORS.mint : COLORS.coral)
-              : COLORS.mist,
-          }}
-        >
-          {centerLabel}
+        <text x={C} y={C} textAnchor="middle" className="pointer-events-none" style={{ fontFamily: SERIF, fontWeight: 600, fill: centerTextColor }}>
+          {centerMode === 'listen' && (
+            <tspan x={C} dy="0.35em" fontSize={20}>
+              Escuchar
+            </tspan>
+          )}
+          {centerMode === 'out' && (
+            <>
+              <tspan x={C} dy="-0.25em" fontSize={18}>
+                Fuera
+              </tspan>
+              <tspan x={C} dy="1.15em" fontSize={18}>
+                de rango
+              </tspan>
+            </>
+          )}
+          {centerMode === 'result' && (
+            <tspan x={C} dy="0.35em" fontSize={resultText.length > 10 ? 14 : 19}>
+              {resultText}
+            </tspan>
+          )}
         </text>
       </g>
     </svg>

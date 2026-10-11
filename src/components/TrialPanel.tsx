@@ -37,8 +37,8 @@ export function TrialPanel({ runner, options, feedback, windowMs, devMode = fals
     : phase === 'playing'
       ? options.includes(OUT_OF_BOUND)
         ? options.length === 2
-          ? `¿Es ${displayNote(options[0])}? Si no, tocá el anillo de afuera`
-          : '¿Qué escuchaste? Si no es ninguna de tus notas, el anillo de afuera'
+          ? `¿Es ${displayNote(options[0])}? Si no, tocá el centro: fuera de rango`
+          : '¿Qué escuchaste? Si no es ninguna de tus notas, tocá el centro'
         : '¿Qué escuchaste?'
     : phase === 'loading' ? 'Cargando'
     : ' ';

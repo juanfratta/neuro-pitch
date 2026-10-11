@@ -56,10 +56,10 @@ export function AnswerGuide({ trained, windowMs, feedback }: Props) {
               </span>
             </li>
             <li className="flex gap-3">
-              <span className="mt-1.5 h-3 w-3 shrink-0 rounded-full border-2 border-[var(--np-lavender)]" aria-hidden />
+              <span className="mt-1.5 h-3 w-3 shrink-0 rounded-full bg-[var(--np-lavender)]" aria-hidden />
               <span>
                 Si suena {single ? `otra nota que no es ${only}` : 'una nota que no es ninguna de las tuyas'}, tocá el
-                anillo de afuera: <strong>fuera de rango</strong>. No hace falta saber qué nota es.
+                centro de la rueda: <strong>fuera de rango</strong>. No hace falta saber qué nota es.
               </span>
             </li>
           </ol>
@@ -68,7 +68,8 @@ export function AnswerGuide({ trained, windowMs, feedback }: Props) {
         )}
         <p className="text-sm text-[var(--np-mist)]">
           {hasOutOfBound &&
-            'Las notas de afuera son vecinas, a uno o dos semitonos, así que se parecen a propósito: el ejercicio es reconocer la tuya entre ellas. '}
+            'Las notas que no son tuyas son vecinas, a uno o dos semitonos, así que se parecen a propósito: el ejercicio es reconocer la tuya entre ellas. '}
+          {hasOutOfBound && 'El centro es Escuchar antes de cada nota y fuera de rango mientras suena, así no tenés que mover la mano. '}
           Tenés {(windowMs / 1000).toFixed(2).replace('.', ',')} s desde que empieza a sonar; si no respondés, cuenta como
           error. {feedback ? 'Después de cada respuesta vas a ver si acertaste.' : 'Este nivel no muestra si acertaste: el resultado aparece al final.'}
         </p>
