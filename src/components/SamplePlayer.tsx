@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { getAudioEngine } from '../audio/engine';
-import { OCTAVES, toMidi, type Chroma } from '../protocol/notes';
+import { OCTAVES, displayNote, toMidi, type Chroma } from '../protocol/notes';
 import { createRng, shuffle } from '../protocol/rng';
 
 const GAP_MS = 1100;
@@ -35,13 +35,14 @@ export function SamplePlayer({ notes, onPlayed }: { notes: Chroma[]; onPlayed: (
           key={note}
           onClick={() => void play(note)}
           disabled={playing !== null}
-          className={`min-w-14 rounded-xl border px-3 py-2 font-semibold transition disabled:cursor-not-allowed ${
+          aria-label={`Escuchar ${note}`}
+          className={`font-display h-12 min-w-12 rounded-full border px-3 text-lg font-semibold transition disabled:cursor-not-allowed ${
             playing === note
-              ? 'border-cyan-500 bg-cyan-500 text-slate-950'
-              : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'
+              ? 'border-[var(--np-brass)] bg-[var(--np-brass)] text-[var(--np-on-accent)]'
+              : 'border-[var(--np-brass)] bg-[var(--np-surface)] text-[var(--np-brass)] hover:brightness-110 disabled:opacity-50'
           }`}
         >
-          {note}
+          {displayNote(note)}
         </button>
       ))}
     </div>
