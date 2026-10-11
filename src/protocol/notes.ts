@@ -40,9 +40,20 @@ export function sortChromatic(notes: readonly Chroma[]): Chroma[] {
   return [...notes].sort((a, b) => chromaIndex(a) - chromaIndex(b));
 }
 
-/** Nombre para mostrar con el símbolo de sostenido real. Cifrado americano, igual que el paper. */
+const FLAT_OF: Record<string, string> = { 'C#': 'D♭', 'D#': 'E♭', 'F#': 'G♭', 'G#': 'A♭', 'A#': 'B♭' };
+
+/**
+ * Las dos partes del nombre: la principal y, en las teclas negras, el enarmónico.
+ * C# → { main: 'C♯', alt: 'D♭' }; F → { main: 'F', alt: null }.
+ */
+export function noteParts(note: string): { main: string; alt: string | null } {
+  return { main: note.replace('#', '♯'), alt: FLAT_OF[note] ?? null };
+}
+
+/** Nombre completo para texto: las teclas negras con sus dos nombres (C♯/D♭). Cifrado americano, igual que el paper. */
 export function displayNote(note: string): string {
-  return note.replace('#', '♯');
+  const { main, alt } = noteParts(note);
+  return alt ? `${main}/${alt}` : main;
 }
 
 export function answerLabel(answer: Answer): string {
