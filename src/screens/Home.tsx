@@ -41,20 +41,51 @@ export function Home({ devMode, onTrain, onTest }: Props) {
 
   if (!pre && !devMode) {
     return (
-      <div className="listening-room mx-auto max-w-2xl space-y-4 rounded-2xl p-6">
-        <Suspense fallback={<div style={{ height: 340 }} />}>
-          <PitchHelix mode="map" learned={[]} next="F" height={340} />
+      <div className="listening-room mx-auto max-w-2xl space-y-5 rounded-2xl p-5 sm:p-7">
+        <Suspense fallback={<div style={{ height: 260 }} />}>
+          <PitchHelix mode="map" learned={[]} next="F" height={260} />
         </Suspense>
-        <h1 className="font-display text-4xl font-semibold tracking-tight">{t('welcome.title')}</h1>
-        <div className="space-y-3 text-sm leading-relaxed text-[var(--np-mist)]">
-          <p>{t('welcome.p1')}</p>
-          <p>{t('welcome.p2')}</p>
-          <p>{t('welcome.p3')}</p>
-          <p>{t('welcome.p4')}</p>
+        <h1 className="font-display text-[2.1rem] font-semibold leading-[1.08] tracking-tight sm:text-5xl">{t('welcome.title')}</h1>
+        <p className="text-[15px] leading-relaxed text-[var(--np-mist)]">{t('welcome.lead')}</p>
+
+        <dl className="grid grid-cols-3 gap-3 border-y border-[var(--np-track)] py-4">
+          {(
+            [
+              ['statHours', 'statHoursLabel'],
+              ['statNotes', 'statNotesLabel'],
+              ['statAll', 'statAllLabel'],
+            ] as const
+          ).map(([value, label]) => (
+            <div key={value}>
+              <dt className="sr-only">{t(`welcome.${label}`)}</dt>
+              <dd className="font-display text-2xl font-semibold text-[var(--np-brass)] sm:text-3xl">{t(`welcome.${value}`)}</dd>
+              <dd className="mt-0.5 text-xs leading-snug text-[var(--np-mist)]">{t(`welcome.${label}`)}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <p className="text-sm">{t('welcome.honest')}</p>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="accent" className="px-7 py-3 text-base" onClick={() => onTest('pre')}>
+            {t('welcome.cta')}
+          </Button>
+          <span className="text-xs text-[var(--np-mist)]">{t('welcome.ctaHint')}</span>
         </div>
-        <Button variant="accent" onClick={() => onTest('pre')}>
-          {t('welcome.cta')}
-        </Button>
+
+        <details className="group rounded-xl border border-[var(--np-track)] px-4 py-3 text-sm">
+          <summary className="cursor-pointer list-none font-semibold marker:hidden">
+            <span className="mr-2 inline-block transition group-open:rotate-90" aria-hidden>
+              ›
+            </span>
+            {t('welcome.moreTitle')}
+          </summary>
+          <div className="mt-3 space-y-2 leading-relaxed text-[var(--np-mist)]">
+            <p>{t('welcome.more1')}</p>
+            <p>{t('welcome.more2')}</p>
+            <p>{t('welcome.more3')}</p>
+          </div>
+        </details>
       </div>
     );
   }
