@@ -89,22 +89,31 @@ function isDarkTheme(): boolean {
   return document.documentElement.classList.contains('dark');
 }
 
-function labelSprite(text: string, color: string): THREE.Sprite {
+/** Etiqueta en dos líneas: el nombre grande y, si hay, el acierto chico debajo. Angosta para no pisarse. */
+function labelSprite(name: string, detail: string | null, color: string): THREE.Sprite {
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 128;
+  canvas.width = 160;
+  canvas.height = 160;
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '600 64px Fraunces, Georgia, serif';
-  ctx.fillText(text, 128, 64);
+  ctx.font = '600 72px Fraunces, Georgia, serif';
+  ctx.fillText(name, 80, detail ? 56 : 80);
+  if (detail) {
+    ctx.globalAlpha = 0.75;
+    ctx.font = '500 40px "Plus Jakarta Sans", system-ui, sans-serif';
+    ctx.fillText(detail, 80, 122);
+  }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
-  sprite.scale.set(1.1, 0.55, 1);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, depthTest: false }));
+  sprite.scale.set(0.62, 0.62, 1);
   return sprite;
 }
+
+/** Radio al que se ubican las etiquetas: por fuera de la hélice, así se separan entre sí. */
+const LABEL_RADIUS = RADIUS + 0.55;
 
 function disposeTree(object: THREE.Object3D) {
   object.traverse((child) => {
@@ -174,9 +183,10 @@ function buildMap(group: THREE.Group, palette: Palette, learned: Chroma[], next:
       column.position.set(bottom.x, (top.y + bottom.y) / 2, bottom.z);
       group.add(column);
 
-      const label = labelSprite(isLearned && acc !== undefined ? `${displayNote(chroma)} ${Math.round(acc)}%` : displayNote(chroma), palette.text);
-      label.position.copy(top).add(new THREE.Vector3(0, 0.5, 0));
-      if (isLearned && acc !== undefined) label.scale.set(1.7, 0.55, 1);
+      const label = labelSprite(displayNote(chroma), isLearned && acc !== undefined ? `${Math.round(acc)}%` : null, palette.text);
+      const theta = (c / 12) * Math.PI * 2;
+      label.position.set(LABEL_RADIUS * Math.sin(theta), top.y + 0.35, LABEL_RADIUS * Math.cos(theta));
+      label.userData.isLabel = true;
       group.add(label);
     }
   });
@@ -302,12 +312,23 @@ export default function PitchHelix({ mode, learned = [], next = null, accuracy, 
       window.addEventListener('pointerup', onUp);
     }
 
+    const labelWorld = new THREE.Vector3();
     const clock = new THREE.Clock();
     let frame = 0;
     const render = () => {
       const t = clock.getElapsedTime();
       if (mode === 'map') {
         group.rotation.y = (reduceMotion ? 0.5 : t * 0.18) + userSpin;
+        // las etiquetas de atrás y de los costados se desvanecen: solo se leen las de adelante
+        group.updateMatrixWorld();
+        group.children.forEach((child) => {
+          if (!child.userData.isLabel) return;
+          child.getWorldPosition(labelWorld);
+          const facing = labelWorld.z / LABEL_RADIUS; // 1 = al frente, -1 = atrás
+          const material = (child as THREE.Sprite).material;
+          material.opacity = Math.min(1, Math.max(0, (facing - 0.15) / 0.45));
+          child.visible = material.opacity > 0.01;
+        });
       } else if (!reduceMotion) {
         // bajar una octava = una vuelta y una altura de octava; el ciclo empalma sin salto
         const phase = (t / SHEPARD_SECONDS_PER_OCTAVE) % 1;
