@@ -1,25 +1,17 @@
-export type AppMode = 'participant' | 'developer';
+/**
+ * Modo desarrollo: muestra la nota esperada en cada trial, permite saltear esperas y
+ * mover el progreso a mano. Se activa con ?dev=1 y se apaga con ?dev=0.
+ */
+const DEV_KEY = 'neuro_pitch_dev';
 
-const APP_MODE_STORAGE_KEY = 'neuro_pitch_app_mode';
-const DEFAULT_APP_MODE: AppMode = 'participant';
-
-export function getAppMode(): AppMode {
-  if (typeof window === 'undefined') return DEFAULT_APP_MODE;
-
-  const stored = localStorage.getItem(APP_MODE_STORAGE_KEY);
-  if (stored === 'participant' || stored === 'developer') {
-    return stored;
+export function readDevMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  const param = new URLSearchParams(window.location.search).get('dev');
+  try {
+    if (param === '1') localStorage.setItem(DEV_KEY, '1');
+    if (param === '0') localStorage.removeItem(DEV_KEY);
+    return localStorage.getItem(DEV_KEY) === '1';
+  } catch {
+    return param === '1';
   }
-
-  return DEFAULT_APP_MODE;
 }
-
-export function setAppMode(mode: AppMode): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(APP_MODE_STORAGE_KEY, mode);
-}
-
-export function getUserStorageKeyByMode(baseKey: string): string {
-  return `${baseKey}_${getAppMode()}`;
-}
-
