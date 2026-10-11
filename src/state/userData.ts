@@ -163,10 +163,14 @@ export function msSinceTraining(data: UserData, now: Date = new Date()): number 
   return data.lastTrainingAt ? now.getTime() - new Date(data.lastTrainingAt).getTime() : Infinity;
 }
 
+/** Motivo por el que algo no está disponible. La UI lo traduce (claves availability.* de i18n). */
+export type AvailabilityReason = 'needsPreTest' | 'needsHours' | 'weeklyLimit' | 'restBeforeTest' | 'restBeforeCold';
+
 export interface Availability {
   available: boolean;
-  /** Si no está disponible, por qué (para mostrar). */
-  reason: string | null;
+  reason: AvailabilityReason | null;
+  /** Horas entrenadas, para el motivo needsHours. */
+  hours?: number;
   /** Milisegundos hasta que se habilita por tiempo, si aplica. */
   waitMs: number;
 }
@@ -174,23 +178,23 @@ export interface Availability {
 export function coldPassAvailability(data: UserData, now: Date = new Date()): Availability {
   if (!data.progress.awaitingColdPass) return { available: false, reason: null, waitMs: 0 };
   const wait = COLD_PASS_REST_MS - msSinceTraining(data, now);
-  if (wait > 0) return { available: false, reason: 'Tienen que pasar 12 h sin entrenar antes del pase final.', waitMs: wait };
+  if (wait > 0) return { available: false, reason: 'restBeforeCold', waitMs: wait };
   return { available: true, reason: null, waitMs: 0 };
 }
 
 export function postTestAvailability(data: UserData, now: Date = new Date()): Availability {
-  if (!preTest(data)) return { available: false, reason: 'Primero hay que hacer el test inicial.', waitMs: 0 };
+  if (!preTest(data)) return { available: false, reason: 'needsPreTest', waitMs: 0 };
   const hours = totalTrainingMs(data) / 3_600_000;
   if (hours < POST_TEST_MIN_HOURS && !data.progress.completed) {
-    return { available: false, reason: `Se habilita con ${POST_TEST_MIN_HOURS} h de entrenamiento (llevás ${hours.toFixed(1)} h).`, waitMs: 0 };
+    return { available: false, reason: 'needsHours', hours, waitMs: 0 };
   }
   const last = lastPostTest(data);
   if (last) {
     const wait = POST_TEST_COOLDOWN_MS - (now.getTime() - new Date(last.endedAt).getTime());
-    if (wait > 0) return { available: false, reason: 'El test de progreso se puede hacer una vez por semana.', waitMs: wait };
+    if (wait > 0) return { available: false, reason: 'weeklyLimit', waitMs: wait };
   }
   const rest = POST_TEST_REST_MS - msSinceTraining(data, now);
-  if (rest > 0) return { available: false, reason: 'Tienen que pasar 12 h sin entrenar antes del test.', waitMs: rest };
+  if (rest > 0) return { available: false, reason: 'restBeforeTest', waitMs: rest };
   return { available: true, reason: null, waitMs: 0 };
 }
 

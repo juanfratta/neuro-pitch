@@ -15,6 +15,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import { CHROMAS, OUT_OF_BOUND, chromaIndex, displayNote, noteParts, type Answer, type Chroma } from '../protocol/notes';
 import type { TrialRecord } from '../protocol/progression';
 import type { TrialPhase } from '../hooks/useTrialRunner';
+import { useTranslation } from 'react-i18next';
 
 const C = 210;
 const VIEW = 176; // medio lado del viewBox
@@ -94,6 +95,7 @@ function NoteLabel({ note, x, y, size, color, compact = false }: { note: Chroma;
 
 export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, lastRecord, onListen, onAnswer, preview = false }: Props) {
   const reduceMotion = useReducedMotion();
+  const { t } = useTranslation();
   const answering = phase === 'playing' && !preview;
   const lit = answering || preview;
   const hasOutOfBound = options.includes(OUT_OF_BOUND);
@@ -132,10 +134,10 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
 
   const resultText = (() => {
     if (!lastRecord || phase !== 'feedback') return '';
-    if (!feedback) return lastRecord.answer === null ? 'Sin respuesta' : 'Registrado';
-    if (lastRecord.correct) return 'Correcto';
-    if (lastRecord.answer === null) return 'Tiempo';
-    return expected === OUT_OF_BOUND ? `Sonó ${displayNote(heard ?? '')}` : `Era ${displayNote(expected ?? '')}`;
+    if (!feedback) return lastRecord.answer === null ? t('wheel.noAnswer') : t('wheel.recorded');
+    if (lastRecord.correct) return t('wheel.correct');
+    if (lastRecord.answer === null) return t('wheel.timeout');
+    return expected === OUT_OF_BOUND ? t('wheel.heard', { note: displayNote(heard ?? '') }) : t('wheel.was', { note: displayNote(expected ?? '') });
   })();
 
   const outRight = showFeedback && expected === OUT_OF_BOUND && lastRecord!.correct;
@@ -171,7 +173,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
       viewBox={`${C - VIEW} ${C - VIEW} ${VIEW * 2} ${VIEW * 2}`}
       className="mx-auto block w-full max-w-[420px] select-none"
       role={preview ? 'img' : 'group'}
-      aria-label={preview ? 'Ejemplo de la rueda de respuestas' : 'Rueda de notas'}
+      aria-label={preview ? t('wheel.previewLabel') : t('wheel.groupLabel')}
     >
       <defs>
         <radialGradient id="wheel-glow" cx="50%" cy="50%" r="50%">
@@ -298,7 +300,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
       {/* Centro: Escuchar, o Fuera de rango mientras suena */}
       <g
         role={centerClickable ? 'button' : undefined}
-        aria-label={centerClickable ? (centerMode === 'listen' ? 'Escuchar' : 'Fuera de rango') : undefined}
+        aria-label={centerClickable ? (centerMode === 'listen' ? t('wheel.listen') : t('common.outOfRange')) : undefined}
         tabIndex={centerClickable ? 0 : -1}
         onClick={onCenter}
         onKeyDown={keyActivate(onCenter)}
@@ -337,16 +339,16 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
         <text x={C} y={C} textAnchor="middle" className="pointer-events-none" style={{ fontFamily: SERIF, fontWeight: 600, fill: centerTextColor }}>
           {centerMode === 'listen' && (
             <tspan x={C} dy="0.35em" fontSize={20}>
-              Escuchar
+              {t('wheel.listen')}
             </tspan>
           )}
           {centerMode === 'out' && (
             <>
               <tspan x={C} dy="-0.25em" fontSize={18}>
-                Fuera
+                {t('wheel.outLine1')}
               </tspan>
               <tspan x={C} dy="1.15em" fontSize={18}>
-                de rango
+                {t('wheel.outLine2')}
               </tspan>
             </>
           )}
