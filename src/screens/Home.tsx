@@ -1,4 +1,5 @@
 import { introductionOrder, trainedSet } from '../protocol/curriculum';
+import { displayNote } from '../protocol/notes';
 import { LEVELS_PER_STAGE, TARGET_TOTAL_HOURS, TARGET_WEEKLY_HOURS, TOTAL_STAGES } from '../protocol/params';
 import { attemptParams, globalLevel } from '../protocol/progression';
 import { useUserData } from '../state/UserDataContext';
@@ -16,6 +17,11 @@ import { useNow } from '../hooks/useNow';
 import { TestComparison } from '../components/TestComparison';
 import { DevPanel } from '../components/DevPanel';
 import { Button, Card, Eyebrow, ProgressBar, Stat } from '../components/ui';
+import { lazy, Suspense } from 'react';
+import { noteAccuracy } from '../state/userData';
+
+// Three.js se carga aparte: no suma peso a las pantallas de entrenamiento.
+const PitchHelix = lazy(() => import('../components/PitchHelix'));
 
 interface Props {
   devMode: boolean;
@@ -30,10 +36,12 @@ export function Home({ devMode, onTrain, onTest }: Props) {
 
   if (!pre && !devMode) {
     return (
-      <Card className="mx-auto max-w-2xl space-y-4">
-        <Eyebrow>Neuro Pitch</Eyebrow>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Oído absoluto de adulto, con método</h1>
-        <div className="space-y-3 text-sm text-slate-700 dark:text-slate-200">
+      <div className="listening-room mx-auto max-w-2xl space-y-4 rounded-2xl p-6">
+        <Suspense fallback={<div style={{ height: 340 }} />}>
+          <PitchHelix mode="map" learned={[]} next="F" height={340} />
+        </Suspense>
+        <h1 className="font-display text-4xl font-semibold tracking-tight">Oído absoluto de adulto, con método</h1>
+        <div className="space-y-3 text-sm leading-relaxed text-[var(--np-mist)]">
           <p>
             El entrenamiento sigue el protocolo de Wong y colegas (2025): se aprende de a una nota, distinguiéndola de sus
             vecinas, con exigencia y velocidad crecientes, hasta cubrir las 12.
@@ -43,10 +51,16 @@ export function Home({ devMode, onTrain, onTest }: Props) {
             notas al 90% de acierto y en menos de 2 segundos. Dos de cada doce llegaron a las 12. Es un trabajo largo y el
             avance es gradual.
           </p>
+          <p>
+            En la hélice, cada vuelta es una octava y cada columna es una nota. Lo que se entrena es la columna: reconocer
+            la nota en cualquier octava.
+          </p>
           <p>Primero hacemos un test inicial para saber desde dónde arrancás.</p>
         </div>
-        <Button onClick={() => onTest('pre')}>Hacer el test inicial</Button>
-      </Card>
+        <Button variant="accent" onClick={() => onTest('pre')}>
+          Hacer el test inicial
+        </Button>
+      </div>
     );
   }
 
@@ -60,6 +74,7 @@ export function Home({ devMode, onTrain, onTest }: Props) {
   const cold = coldPassAvailability(data, now);
   const post = postTestAvailability(data, now);
   const lastPost = lastPostTest(data);
+  const accuracy = noteAccuracy(data);
   const recent = data.attempts.filter((a) => a.kind === 'level').slice(-5).reverse();
 
   const trainLabel = progress.completed ? 'Protocolo completo' : progress.awaitingColdPass ? 'Pase final en frío' : 'Entrenar';
@@ -68,48 +83,43 @@ export function Home({ devMode, onTrain, onTest }: Props) {
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-4">
-        <Card className="space-y-4">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <Eyebrow>Tu entrenamiento</Eyebrow>
-              <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
-                Etapa {progress.stage} de {TOTAL_STAGES} · nivel {progress.level} de {LEVELS_PER_STAGE}
+        <section className="listening-room grid items-center gap-2 overflow-hidden rounded-2xl p-5 sm:p-7 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+          <div className="order-2 space-y-4 md:order-1">
+            <p className="font-display text-4xl font-semibold leading-[1.05] tracking-tight">
+              {trained.length} {trained.length === 1 ? 'nota' : 'notas'}
+              <span className="block text-2xl text-[var(--np-mist)]">
+                nivel {progress.level} de {LEVELS_PER_STAGE}
+              </span>
+            </p>
+            <div className="space-y-1.5">
+              <div className="h-1.5 overflow-hidden rounded-full bg-[var(--np-track)]">
+                <div className="h-full rounded-full bg-[var(--np-brass)]" style={{ width: `${(globalLevel(progress) / 288) * 100}%` }} />
+              </div>
+              <p className="text-xs tabular-nums text-[var(--np-mist)]">
+                Recorrido total: {globalLevel(progress)} de {LEVELS_PER_STAGE * TOTAL_STAGES} niveles
               </p>
             </div>
-            <p className="text-sm tabular-nums text-slate-500 dark:text-slate-400">{globalLevel(progress)}/288</p>
+            <p className="text-sm leading-relaxed text-[var(--np-mist)]">
+              Este nivel pide {params.minAccuracy}% de aciertos, respondiendo en menos de {(params.windowMs / 1000).toFixed(2)} s,{' '}
+              {params.feedback ? 'con feedback' : 'sin feedback'}.
+              {order[trained.length] && ` La próxima nota es ${displayNote(order[trained.length])}.`}
+              {progress.awaitingColdPass && ' Te falta el pase final: un intento en frío después de 12 h sin entrenar.'}
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button variant="accent" onClick={onTrain} disabled={trainDisabled} className="px-8 py-3 text-base">
+                {trainLabel}
+              </Button>
+              {progress.awaitingColdPass && !cold.available && (
+                <span className="text-xs text-[var(--np-mist)]">Disponible en {formatDuration(cold.waitMs)}</span>
+              )}
+            </div>
           </div>
-          <ProgressBar value={(globalLevel(progress) / 288) * 100} />
-
-          <div className="flex flex-wrap gap-1.5">
-            {order.map((note) => (
-              <span
-                key={note}
-                className={`rounded-lg px-2.5 py-1 text-sm font-semibold ${
-                  trained.includes(note)
-                    ? 'bg-cyan-500 text-slate-950 dark:bg-cyan-400'
-                    : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
-                }`}
-              >
-                {note}
-              </span>
-            ))}
+          <div className="order-1 md:order-2">
+            <Suspense fallback={<div style={{ height: 380 }} />}>
+              <PitchHelix mode="map" learned={trained} next={order[trained.length] ?? null} accuracy={accuracy} height={380} className="cursor-grab active:cursor-grabbing" />
+            </Suspense>
           </div>
-
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            Este nivel pide {params.minAccuracy}% de aciertos, respondiendo en menos de {(params.windowMs / 1000).toFixed(2)} s,{' '}
-            {params.feedback ? 'con feedback' : 'sin feedback'}.
-            {progress.awaitingColdPass && ' Te falta el pase final: un intento en frío después de 12 h sin entrenar.'}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={onTrain} disabled={trainDisabled} className="px-6">
-              {trainLabel}
-            </Button>
-            {progress.awaitingColdPass && !cold.available && (
-              <span className="text-xs text-slate-500 dark:text-slate-400">Disponible en {formatDuration(cold.waitMs)}</span>
-            )}
-          </div>
-        </Card>
+        </section>
 
         <Card className="space-y-4">
           <Eyebrow>Tests</Eyebrow>

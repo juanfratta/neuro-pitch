@@ -40,7 +40,11 @@ export function sortChromatic(notes: readonly Chroma[]): Chroma[] {
   return [...notes].sort((a, b) => chromaIndex(a) - chromaIndex(b));
 }
 
-/** Nombre para mostrar. Usamos cifrado americano, igual que el paper. */
+/** Nombre para mostrar con el símbolo de sostenido real. Cifrado americano, igual que el paper. */
+export function displayNote(note: string): string {
+  return note.replace('#', '♯');
+}
+
 export function answerLabel(answer: Answer): string {
-  return answer === OUT_OF_BOUND ? 'Fuera de rango' : answer;
+  return answer === OUT_OF_BOUND ? 'Fuera de rango' : displayNote(answer);
 }

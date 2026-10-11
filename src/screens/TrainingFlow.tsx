@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { getAudioEngine } from '../audio/engine';
 import { useTrialRunner } from '../hooks/useTrialRunner';
 import { answerOptions, generateSpecialStimuli, generateTrainingStimuli, introductionOrder, type Stimulus } from '../protocol/curriculum';
@@ -29,6 +29,8 @@ import { SamplePlayer } from '../components/SamplePlayer';
 import { TrialPanel } from '../components/TrialPanel';
 import { Button, Eyebrow, Stat } from '../components/ui';
 import { useNow } from '../hooks/useNow';
+
+const PitchHelix = lazy(() => import('../components/PitchHelix'));
 
 type Step =
   | { name: 'intro' }
@@ -326,13 +328,16 @@ function ShepardStep({ onDone, devMode }: { onDone: () => void; devMode: boolean
 
   const remaining = Math.max(0, SHEPARD_DURATION_MS - (now - startedAt));
   return (
-    <div className="flex min-h-[14rem] flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-6 text-center dark:border-slate-800 dark:bg-slate-900/60">
-      <p className="text-lg font-semibold text-slate-900 dark:text-white">Limpiando la referencia</p>
-      <p className="max-w-md text-sm text-slate-600 dark:text-slate-300">
-        Este tono baja sin parar y no tiene una nota fija. Sirve para que lo que escuchaste en las muestras no quede como
-        referencia para el nivel sin feedback.
+    <div className="listening-room relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl p-6 text-center">
+      <Suspense fallback={<div style={{ height: 280 }} />}>
+        <PitchHelix mode="shepard" height={280} className="w-full" />
+      </Suspense>
+      <p className="font-display text-2xl font-semibold">Limpiando la referencia</p>
+      <p className="max-w-md text-sm text-[var(--np-mist)]">
+        Este tono baja sin parar, como la espiral: nunca llega a una nota fija. Así lo que escuchaste en las muestras no
+        queda como referencia para el nivel sin feedback.
       </p>
-      <p className="font-mono text-2xl tabular-nums text-slate-900 dark:text-white">{Math.ceil(remaining / 1000)} s</p>
+      <p className="font-display text-3xl tabular-nums">{Math.ceil(remaining / 1000)} s</p>
       {devMode && (
         <Button variant="ghost" onClick={() => { getAudioEngine().stopShepard(); onDone(); }}>
           dev: saltear
