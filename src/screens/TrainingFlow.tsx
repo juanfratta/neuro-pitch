@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { getAudioEngine } from '../audio/engine';
 import { useTrialRunner } from '../hooks/useTrialRunner';
-import { answerOptions, generateSpecialStimuli, generateTrainingStimuli, introductionOrder, type Stimulus } from '../protocol/curriculum';
-import { OUT_OF_BOUND, type Answer, type Chroma } from '../protocol/notes';
+import { answerOptions, generateSpecialStimuli, generateTrainingStimuli, type Stimulus } from '../protocol/curriculum';
+import { OUT_OF_BOUND, displayNote, type Answer, type Chroma } from '../protocol/notes';
 import {
   SHEPARD_DURATION_MS,
   SPECIAL_EXERCISE_EVERY_ATTEMPTS,
@@ -14,7 +14,6 @@ import {
 import {
   attemptParams,
   canRetreat,
-  globalLevel,
   specialExerciseDue,
   summarize,
   weakestChroma,
@@ -26,8 +25,9 @@ import { createRng } from '../protocol/rng';
 import { useUserData } from '../state/UserDataContext';
 import { coldPassAvailability, formatDuration, recentLevelTrials, type AttemptKind } from '../state/userData';
 import { SamplePlayer } from '../components/SamplePlayer';
+import { AnswerGuide } from '../components/AnswerGuide';
 import { TrialPanel } from '../components/TrialPanel';
-import { Button, Eyebrow, Stat } from '../components/ui';
+import { Button, Eyebrow } from '../components/ui';
 import { useNow } from '../hooks/useNow';
 
 const PitchHelix = lazy(() => import('../components/PitchHelix'));
@@ -126,59 +126,47 @@ export function TrainingFlow({ onExit, devMode }: { onExit: () => void; devMode:
       </div>
 
       {step.name === 'intro' && (
-        <div className="space-y-5">
+        <div className="listening-room space-y-6 rounded-2xl p-5 sm:p-7">
           {blocked ? (
-            <p className="rounded-xl bg-slate-100 p-4 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            <p className="text-sm text-[var(--np-mist)]">
               {progress.completed ? 'Ya completaste el protocolo.' : `${cold.reason} Falta ${formatDuration(cold.waitMs)}.`}
             </p>
           ) : (
             <>
               {isColdPass && (
-                <p className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                <p className="rounded-xl border border-[var(--np-brass)] p-4 text-sm">
                   Pase final en frío: un solo intento, sin muestras previas. Si sale, el protocolo queda completo.
                 </p>
               )}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Stat label="Para pasar" value={`${params.minAccuracy}%`} />
-                <Stat label="Respuesta" value={`${(params.windowMs / 1000).toFixed(2)} s`} hint="desde que suena" />
-                <Stat label="Feedback" value={params.feedback ? 'Sí' : 'No'} />
-                <Stat label="Nivel global" value={`${globalLevel(progress)}/288`} />
-              </div>
 
-              <div className="space-y-2">
-                <p className="text-sm text-slate-700 dark:text-slate-200">
-                  Vas a escuchar las notas que estás aprendiendo y también notas vecinas. Si el sonido no es ninguna de tus
-                  notas, la respuesta es <span className="font-semibold">Fuera de rango</span>.
-                </p>
-                {answerOptions(params.trained).includes(OUT_OF_BOUND) && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Próxima nota a aprender: {introductionOrder()[params.trained.length] ?? '—'}
-                  </p>
-                )}
-              </div>
+              <AnswerGuide trained={params.trained} windowMs={params.windowMs} feedback={params.feedback} />
+
+              <p className="border-t border-[var(--np-track)] pt-5 text-sm text-[var(--np-mist)]">
+                Para pasar este nivel hace falta {params.minAccuracy}% de aciertos en {TRIALS_PER_ATTEMPT} notas.
+                {progress.failedAtLevel > 0 && ` Llevás ${progress.failedAtLevel} ${progress.failedAtLevel === 1 ? 'intento' : 'intentos'} en este nivel.`}
+              </p>
 
               {!isColdPass && (
-                <div className="space-y-2 rounded-xl border border-slate-200 p-4 dark:border-slate-800">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Muestras (opcional)</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Elegí una nota para escucharla en sus tres octavas.
-                    {!params.feedback && ' Como este nivel no tiene feedback, si escuchás muestras va a sonar un tono de 20 s para borrar la referencia antes de empezar.'}
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">Antes de empezar, podés escuchar tus notas</p>
+                  <p className="text-xs text-[var(--np-mist)]">
+                    Cada una suena en sus tres octavas.
+                    {!params.feedback && ' Como este nivel no tiene feedback, si las escuchás va a sonar un tono de 20 s para borrar la referencia.'}
                   </p>
                   <SamplePlayer notes={params.trained} onPlayed={() => setHeardSamples(true)} />
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={() => void begin()}>Empezar intento</Button>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button variant="accent" className="px-8 py-3 text-base" onClick={() => void begin()}>
+                  Empezar intento
+                </Button>
                 {canRetreat(progress) && (
                   <Button variant="secondary" onClick={retreat}>
                     Volver a un nivel más fácil
                   </Button>
                 )}
               </div>
-              {progress.failedAtLevel > 0 && (
-                <p className="text-xs text-slate-500 dark:text-slate-400">Intentos sin pasar en este nivel: {progress.failedAtLevel}</p>
-              )}
             </>
           )}
         </div>
@@ -205,7 +193,11 @@ export function TrainingFlow({ onExit, devMode }: { onExit: () => void; devMode:
           message={step.outcome ? OUTCOME_TEXT[step.outcome] : ''}
           actions={
             <>
-              {!data.progress.completed && <Button onClick={nextAttempt}>Seguir</Button>}
+              {!data.progress.completed && (
+                <Button variant="accent" onClick={nextAttempt}>
+                  Seguir
+                </Button>
+              )}
               <Button variant="secondary" onClick={onExit}>
                 Volver al inicio
               </Button>
@@ -215,13 +207,14 @@ export function TrainingFlow({ onExit, devMode }: { onExit: () => void; devMode:
       )}
 
       {step.name === 'special-intro' && (
-        <div className="space-y-4">
-          <p className="text-sm text-slate-700 dark:text-slate-200">
-            Ejercicio sobre tu nota más floja: <span className="font-semibold">{step.target}</span>. Vas a escuchar tonos y
-            responder si es {step.target} o no. Primero {SPECIAL_EXERCISE_FEEDBACK_TRIALS} trials con feedback y después{' '}
-            {SPECIAL_EXERCISE_NO_FEEDBACK_TRIALS} sin feedback.
+        <div className="listening-room space-y-4 rounded-2xl p-5 sm:p-7">
+          <p className="font-display text-2xl font-semibold">Ejercicio sobre {displayNote(step.target)}</p>
+          <p className="text-[15px] leading-relaxed">
+            Es la nota que más te está costando. Vas a escuchar tonos sueltos: si suena {displayNote(step.target)}, tocá{' '}
+            {displayNote(step.target)}; si no, tocá el anillo de afuera. Primero {SPECIAL_EXERCISE_FEEDBACK_TRIALS} notas con
+            feedback y después {SPECIAL_EXERCISE_NO_FEEDBACK_TRIALS} sin feedback.
           </p>
-          <Button onClick={() => { setAttemptStart(new Date()); setStep({ name: 'special-running', target: step.target, phase: 'feedback' }); }}>
+          <Button variant="accent" onClick={() => { setAttemptStart(new Date()); setStep({ name: 'special-running', target: step.target, phase: 'feedback' }); }}>
             Empezar ejercicio
           </Button>
         </div>
@@ -259,7 +252,9 @@ export function TrainingFlow({ onExit, devMode }: { onExit: () => void; devMode:
           message="Resultado de la parte sin feedback. Este ejercicio no aprueba ni desaprueba: sirve para afinar la nota más floja."
           actions={
             <>
-              <Button onClick={() => setStep({ name: 'intro' })}>Volver al nivel</Button>
+              <Button variant="accent" onClick={() => setStep({ name: 'intro' })}>
+                Volver al nivel
+              </Button>
               <Button variant="secondary" onClick={onExit}>
                 Volver al inicio
               </Button>
@@ -358,21 +353,34 @@ export function SummaryView({
   message: string;
   actions: React.ReactNode;
 }) {
+  const stats = [
+    { label: 'Aciertos', value: `${summary.accuracy.toFixed(0)}%`, hint: `${summary.correct} de ${summary.total}` },
+    {
+      label: 'Error medio',
+      value: summary.meanErrorSemitones === null ? '—' : summary.meanErrorSemitones.toFixed(2).replace('.', ','),
+      hint: 'semitonos',
+    },
+    {
+      label: 'Tiempo de los aciertos',
+      value: summary.meanCorrectRtMs === null ? '—' : `${(summary.meanCorrectRtMs / 1000).toFixed(2).replace('.', ',')} s`,
+      hint: 'desde que suena',
+    },
+  ];
   return (
-    <div className="space-y-4">
+    <div className="listening-room space-y-6 rounded-2xl p-5 sm:p-7">
       <div>
-        <p className="text-2xl font-semibold text-slate-900 dark:text-white">{title}</p>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{message}</p>
+        <p className="font-display text-3xl font-semibold">{title}</p>
+        <p className="mt-1 text-sm text-[var(--np-mist)]">{message}</p>
       </div>
-      <div className="grid grid-cols-3 gap-3">
-        <Stat label="Aciertos" value={`${summary.accuracy.toFixed(0)}%`} hint={`${summary.correct}/${summary.total}`} />
-        <Stat
-          label="Error medio"
-          value={summary.meanErrorSemitones === null ? '—' : `${summary.meanErrorSemitones.toFixed(2)} st`}
-          hint="en semitonos"
-        />
-        <Stat label="Tiempo (aciertos)" value={summary.meanCorrectRtMs === null ? '—' : `${(summary.meanCorrectRtMs / 1000).toFixed(2)} s`} />
-      </div>
+      <dl className="grid grid-cols-3 gap-4 border-y border-[var(--np-track)] py-5">
+        {stats.map((stat) => (
+          <div key={stat.label}>
+            <dt className="text-xs text-[var(--np-mist)]">{stat.label}</dt>
+            <dd className="font-display mt-1 text-3xl font-semibold tabular-nums">{stat.value}</dd>
+            <dd className="text-xs text-[var(--np-muted)]">{stat.hint}</dd>
+          </div>
+        ))}
+      </dl>
       <div className="flex flex-wrap gap-2">{actions}</div>
     </div>
   );

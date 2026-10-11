@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { Answer } from '../protocol/notes';
+import { OUT_OF_BOUND, displayNote, type Answer } from '../protocol/notes';
 import type { useTrialRunner } from '../hooks/useTrialRunner';
 import { ChromaWheel } from './ChromaWheel';
 
@@ -33,7 +33,12 @@ export function TrialPanel({ runner, options, feedback, windowMs, devMode = fals
 
   const hint =
     phase === 'ready' ? 'Tocá el centro o la barra espaciadora'
-    : phase === 'playing' ? '¿Qué escuchaste?'
+    : phase === 'playing'
+      ? options.includes(OUT_OF_BOUND)
+        ? options.length === 2
+          ? `¿Es ${displayNote(options[0])}? Si no, tocá el anillo de afuera`
+          : '¿Qué escuchaste? Si no es ninguna de tus notas, el anillo de afuera'
+        : '¿Qué escuchaste?'
     : phase === 'loading' ? 'Cargando'
     : ' ';
 

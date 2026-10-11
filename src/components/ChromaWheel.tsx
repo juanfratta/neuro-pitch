@@ -24,6 +24,8 @@ const RING_OUTER = 204;
 /** Línea base del texto del anillo: centrado en la banda. */
 const RING_LABEL = (RING_INNER + RING_OUTER) / 2 - 4;
 const LOCKED_LABEL_RADIUS = 120;
+/** En la mitad de abajo el texto queda hacia adentro de la línea base. */
+const RING_LABEL_BOTTOM = (RING_INNER + RING_OUTER) / 2 + 4;
 
 /** Colores por tema: definidos como variables en index.css (.dark cambia la paleta). */
 const COLORS = {
@@ -70,13 +72,16 @@ interface Props {
   lastRecord: TrialRecord | null;
   onListen: () => void;
   onAnswer: (answer: Answer) => void;
+  /** Vista estática para explicar cómo responder: sin interacción ni texto en el centro. */
+  preview?: boolean;
 }
 
 type NoteState = 'idle' | 'active' | 'locked' | 'correct' | 'wrong' | 'reveal';
 
-export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, lastRecord, onListen, onAnswer }: Props) {
+export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, lastRecord, onListen, onAnswer, preview = false }: Props) {
   const reduceMotion = useReducedMotion();
-  const answering = phase === 'playing';
+  const answering = phase === 'playing' && !preview;
+  const lit = answering || preview;
   const hasOutOfBound = options.includes(OUT_OF_BOUND);
   const showFeedback = phase === 'feedback' && feedback && lastRecord !== null;
 
@@ -92,7 +97,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
       if (expected === OUT_OF_BOUND && note === heard) return 'reveal';
     }
     if (!isOption) return 'locked';
-    return answering ? 'active' : 'idle';
+    return lit ? 'active' : 'idle';
   };
 
   const ringState: NoteState = showFeedback
@@ -103,7 +108,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
         : answering
           ? 'active'
           : 'idle'
-    : answering
+    : lit
       ? 'active'
       : 'idle';
 
@@ -116,6 +121,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
   const timerLength = 2 * Math.PI * TIMER_RADIUS;
 
   const centerLabel = (() => {
+    if (preview) return '';
     if (phase === 'ready') return 'Escuchar';
     if (phase === 'loading') return '';
     if (phase === 'playing') return '';
@@ -136,7 +142,12 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
   };
 
   return (
-    <svg viewBox={hasOutOfBound ? `0 0 ${SIZE} ${SIZE}` : `${C - 176} ${C - 176} 352 352`} className="mx-auto block w-full max-w-[440px] select-none" role="group" aria-label="Rueda de notas">
+    <svg
+      viewBox={hasOutOfBound ? `0 0 ${SIZE} ${SIZE}` : `${C - 176} ${C - 176} 352 352`}
+      className="mx-auto block w-full max-w-[440px] select-none"
+      role={preview ? 'img' : 'group'}
+      aria-label={preview ? 'Ejemplo de la rueda de respuestas' : 'Rueda de notas'}
+    >
       <defs>
         <radialGradient id="wheel-glow" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor={COLORS.surface} stopOpacity="0.9" />
@@ -144,6 +155,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
           <stop offset="100%" stopColor={COLORS.room} stopOpacity="0" />
         </radialGradient>
         <path id="ring-label-path" d={`M ${C - RING_LABEL} ${C} A ${RING_LABEL} ${RING_LABEL} 0 0 1 ${C + RING_LABEL} ${C}`} />
+        <path id="ring-label-path-bottom" d={`M ${C - RING_LABEL_BOTTOM} ${C} A ${RING_LABEL_BOTTOM} ${RING_LABEL_BOTTOM} 0 0 0 ${C + RING_LABEL_BOTTOM} ${C}`} />
       </defs>
 
       <circle cx={C} cy={C} r={RING_INNER - 4} fill="url(#wheel-glow)" />
@@ -151,8 +163,8 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
       {/* Anillo fuera de rango */}
       {hasOutOfBound && (
         <g
-          role="button"
-          aria-label="Fuera de rango"
+          role={preview ? undefined : 'button'}
+          aria-label={preview ? undefined : 'Fuera de rango'}
           aria-disabled={!answering}
           tabIndex={answering ? 0 : -1}
           onClick={() => answering && onAnswer(OUT_OF_BOUND)}
@@ -169,15 +181,19 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
               transition: reduceMotion ? undefined : FILL_TRANSITION,
             }}
           />
-          <text
-            fontSize="11"
-            letterSpacing="3"
-            style={{ fontWeight: 600, fill: ringState === 'idle' ? COLORS.faint : ringState === 'active' ? COLORS.mist : COLORS.onAccent }}
-          >
-            <textPath href="#ring-label-path" startOffset="50%" textAnchor="middle">
-              fuera de rango
-            </textPath>
-          </text>
+          {(['ring-label-path', 'ring-label-path-bottom'] as const).map((id) => (
+            <text
+              key={id}
+              fontSize="11"
+              letterSpacing="3"
+              className="pointer-events-none"
+              style={{ fontWeight: 600, fill: ringState === 'idle' ? COLORS.faint : ringState === 'active' ? COLORS.mist : COLORS.onAccent }}
+            >
+              <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">
+                fuera de rango
+              </textPath>
+            </text>
+          ))}
         </g>
       )}
 
@@ -221,9 +237,9 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
         return (
           <g
             key={note}
-            role={options.includes(note) ? 'button' : undefined}
-            aria-label={options.includes(note) ? note : undefined}
-            aria-disabled={options.includes(note) ? !clickable : undefined}
+            role={options.includes(note) && !preview ? 'button' : undefined}
+            aria-label={options.includes(note) && !preview ? note : undefined}
+            aria-disabled={options.includes(note) && !preview ? !clickable : undefined}
             tabIndex={clickable ? 0 : -1}
             onClick={() => clickable && onAnswer(note)}
             onKeyDown={keyActivate(() => clickable && onAnswer(note))}
@@ -300,12 +316,12 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
 
       {/* Centro */}
       <g
-        role={phase === 'ready' ? 'button' : undefined}
-        aria-label={phase === 'ready' ? 'Escuchar' : undefined}
-        tabIndex={phase === 'ready' ? 0 : -1}
-        onClick={() => phase === 'ready' && onListen()}
-        onKeyDown={keyActivate(() => phase === 'ready' && onListen())}
-        className={phase === 'ready' ? 'cursor-pointer outline-none' : 'outline-none'}
+        role={phase === 'ready' && !preview ? 'button' : undefined}
+        aria-label={phase === 'ready' && !preview ? 'Escuchar' : undefined}
+        tabIndex={phase === 'ready' && !preview ? 0 : -1}
+        onClick={() => phase === 'ready' && !preview && onListen()}
+        onKeyDown={keyActivate(() => phase === 'ready' && !preview && onListen())}
+        className={phase === 'ready' && !preview ? 'cursor-pointer outline-none' : 'outline-none'}
       >
         <motion.g
           whileHover={phase === 'ready' && !reduceMotion ? { scale: 1.04 } : undefined}
@@ -317,8 +333,8 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
             r={CENTER_RADIUS}
             strokeWidth={2}
             style={{
-              fill: phase === 'ready' ? COLORS.brass : COLORS.center,
-              stroke: phase === 'ready' ? COLORS.brass : COLORS.faint,
+              fill: phase === 'ready' && !preview ? COLORS.brass : COLORS.center,
+              stroke: phase === 'ready' && !preview ? COLORS.brass : COLORS.faint,
               transition: reduceMotion ? undefined : FILL_TRANSITION,
             }}
           />
