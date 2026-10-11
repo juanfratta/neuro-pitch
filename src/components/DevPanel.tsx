@@ -3,6 +3,7 @@ import { useUserData } from '../state/UserDataContext';
 import { expandTrial } from '../state/userData';
 import { LEVELS_PER_STAGE, TOTAL_STAGES } from '../protocol/params';
 import { Button, Card, Eyebrow } from './ui';
+import { readRevealAnswers, setRevealAnswers } from '../utils/app-mode';
 
 function download(name: string, content: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -17,6 +18,7 @@ export function DevPanel() {
   const { data, setProgress, reset, replace } = useUserData();
   const [stage, setStage] = useState(data.progress.stage);
   const [level, setLevel] = useState(data.progress.level);
+  const [reveal, setReveal] = useState(readRevealAnswers);
 
   const exportCsv = () => {
     const lines = ['source,kind,stage,level,trial,midi,chroma,octave,timbre,expected,answer,rt_ms,correct'];
@@ -67,7 +69,24 @@ export function DevPanel() {
           Borrar datos
         </Button>
       </div>
-      <p className="text-xs text-slate-500">En los trials se ve la respuesta esperada. Apagar con ?dev=0.</p>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-1 h-4 w-4"
+          checked={reveal}
+          onChange={(e) => {
+            setRevealAnswers(e.target.checked);
+            setReveal(e.target.checked);
+          }}
+        />
+        <span>
+          Mostrar la respuesta en cada trial
+          <span className="block text-xs text-slate-500">Solo para probar la app: con esto prendido el entrenamiento no sirve.</span>
+        </span>
+      </label>
+      <a href={window.location.pathname} className="inline-block text-xs font-semibold text-slate-600 underline dark:text-slate-300">
+        Salir del modo desarrollo
+      </a>
     </Card>
   );
 }

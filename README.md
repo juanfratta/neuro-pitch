@@ -24,7 +24,7 @@ npm test           # tests del motor del protocolo
 npm run build
 ```
 
-Modo desarrollo: abrir con `?dev=1`. Muestra la respuesta esperada en cada trial, permite saltear el tono de Shepard, mover etapa y nivel, simular 12 h sin entrenar y exportar los datos en JSON o CSV. Se apaga con `?dev=0`.
+Modo desarrollo: abrir con `?dev=1`. Muestra la respuesta esperada en cada trial, permite saltear el tono de Shepard, mover etapa y nivel, simular 12 h sin entrenar y exportar los datos en JSON o CSV. Solo dura mientras `?dev=1` esté en la URL; la respuesta esperada en cada trial es una opción aparte del panel, apagada por defecto.
 
 ## Estructura
 

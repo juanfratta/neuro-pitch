@@ -40,8 +40,17 @@ function Shell() {
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Neuro Pitch</p>
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">Protocolo Wong et al. 2025{devMode ? ' · dev' : ''}</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">Protocolo Wong et al. 2025</p>
           </div>
+          {devMode && (
+            <a
+              href={window.location.pathname}
+              title="Salir del modo desarrollo"
+              className="rounded-full border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300"
+            >
+              Modo desarrollo · salir
+            </a>
+          )}
           <button
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
             onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
