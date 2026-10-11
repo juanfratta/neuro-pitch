@@ -1,287 +1,164 @@
 /**
- * Audio Engine for Absolute Pitch Training
- * Using soundfont-player for high-quality MIDI instrument sounds
- * 
- * Specifications:
- * - A4 = 440 Hz (fixed tuning via soundfont)
- * - Note duration: 4 seconds (per protocol)
- * - Instruments: Acoustic Piano, Synth Pad (warm)
- * - Octaves: 1, 2, 3, 4, 5, 6 (extended range for pitch training)
- * - High-quality soundfont samples from MusyngKite
- * - Constant volume across all notes
+ * Motor de audio.
+ *
+ * - Tres timbres, como el paper: un piano para entrenar, otro piano distinto para
+ *   los tests (para medir "piano" y no un sample) y guitarra como timbre no entrenado.
+ * - Clips de 800 ms con rampa de 100 ms.
+ * - Devuelve el instante de inicio real de la nota, para medir el tiempo de respuesta
+ *   desde el inicio (como el paper) y no desde que termina.
+ * - Tono de Shepard descendente para borrar la memoria de trabajo antes de niveles sin feedback.
  */
 
-import type { ChromaticNote, Timbre, Octave } from '../types';
-import { CHROMATIC_NOTES } from '../types';
 import Soundfont from 'soundfont-player';
+import type { Timbre } from '../protocol/curriculum';
+import { NOTE_DURATION_MS, NOTE_RAMP_MS, SHEPARD_DURATION_MS } from '../protocol/params';
 
-/**
- * Mapping of chromatic notes to MIDI note offsets within an octave
- * C = 0, C# = 1, D = 2, etc. (Middle C = MIDI 60)
- */
-const NOTE_MIDI_OFFSETS: { [key in ChromaticNote]: number } = {
-  C: 0,
-  'C#': 1,
-  D: 2,
-  'D#': 3,
-  E: 4,
-  F: 5,
-  'F#': 6,
-  G: 7,
-  'G#': 8,
-  A: 9,
-  'A#': 10,
-  B: 11,
+const INSTRUMENTS: Record<Timbre, { soundfont: 'MusyngKite' | 'FluidR3_GM'; name: string }> = {
+  'piano-train': { soundfont: 'MusyngKite', name: 'acoustic_grand_piano' },
+  'piano-test': { soundfont: 'FluidR3_GM', name: 'acoustic_grand_piano' },
+  'guitar-test': { soundfont: 'FluidR3_GM', name: 'acoustic_guitar_nylon' },
 };
 
-/**
- * Calculate MIDI note number from note and octave
- * Formula: MIDI note = (octave + 1) * 12 + note_offset
- * C4 (middle C) = MIDI 60
- */
-function getMIDINote(note: ChromaticNote, octave: Octave): number {
-  return (octave + 1) * 12 + NOTE_MIDI_OFFSETS[note];
-}
+/** Margen para programar la nota en el reloj de audio sin cortes. */
+const SCHEDULE_AHEAD_S = 0.05;
 
+// soundfont-player no trae tipos.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Player = any;
 
-
-/**
- * Main audio engine class using Soundfont
- */
 export class AudioEngine {
-  private audioContext: AudioContext | null = null;
-  private pianoInstrument: any = null;
-  private synthInstrument: any = null;
-  private isInitializing = false;
-  private initializePromise: Promise<void> | null = null;
-  private currentNoteController: AbortController | null = null;
+  private ctx: AudioContext | null = null;
+  private players = new Map<Timbre, Promise<Player>>();
+  private activeNodes: Player[] = [];
+  private shepardSource: AudioBufferSourceNode | null = null;
 
-  constructor() {
-    // Initialize on first use to avoid SSR issues
-    this.lazyInitializeAudioContext();
+  private context(): AudioContext {
+    if (!this.ctx || this.ctx.state === 'closed') {
+      this.ctx = new AudioContext();
+    }
+    return this.ctx;
+  }
+
+  /** Hay que llamarlo desde un gesto del usuario (clic) por la política de autoplay. */
+  async unlock(): Promise<void> {
+    const ctx = this.context();
+    if (ctx.state === 'suspended') await ctx.resume();
+  }
+
+  load(timbre: Timbre): Promise<Player> {
+    let player = this.players.get(timbre);
+    if (!player) {
+      const { soundfont, name } = INSTRUMENTS[timbre];
+      player = Soundfont.instrument(this.context(), name as never, { soundfont });
+      player.catch(() => this.players.delete(timbre));
+      this.players.set(timbre, player);
+    }
+    return player;
+  }
+
+  async preload(timbres: readonly Timbre[]): Promise<void> {
+    await Promise.all(timbres.map((t) => this.load(t)));
+  }
+
+  /** Toca una nota y devuelve el momento (performance.now) en que empieza a sonar. */
+  async playMidi(midi: number, timbre: Timbre): Promise<number> {
+    const player = await this.load(timbre);
+    const ctx = this.context();
+    if (ctx.state === 'suspended') await ctx.resume();
+    this.stopNotes();
+
+    const when = ctx.currentTime + SCHEDULE_AHEAD_S;
+    const ramp = NOTE_RAMP_MS / 1000;
+    const node = player.play(midi, when, {
+      duration: (NOTE_DURATION_MS - NOTE_RAMP_MS) / 1000,
+      attack: ramp,
+      release: ramp,
+      gain: 2,
+    });
+    this.activeNodes.push(node);
+    return performance.now() + SCHEDULE_AHEAD_S * 1000;
+  }
+
+  stopNotes(): void {
+    for (const node of this.activeNodes) {
+      try {
+        node?.stop?.();
+      } catch {
+        // ya terminó
+      }
+    }
+    this.activeNodes = [];
   }
 
   /**
-   * Lazy initialization of AudioContext
-   * Required due to browser autoplay policy
+   * Tono de Shepard: sinusoides a una octava de distancia que bajan sin parar, con una
+   * envolvente fija en frecuencia, así nunca se percibe una nota estable.
+   * Resuelve cuando termina o cuando se corta con stopShepard.
    */
-  private lazyInitializeAudioContext(): void {
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      return;
+  async playShepard(durationMs: number = SHEPARD_DURATION_MS): Promise<void> {
+    const ctx = this.context();
+    if (ctx.state === 'suspended') await ctx.resume();
+    this.stopShepard();
+
+    const sampleRate = ctx.sampleRate;
+    const length = Math.floor((durationMs / 1000) * sampleRate);
+    const buffer = ctx.createBuffer(1, length, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    const components = 9;
+    const minFreq = 27.5; // A0
+    const cycleSeconds = 10; // cada componente baja una octava cada 10 s
+    const fade = Math.min(sampleRate, length / 4);
+    const phases = new Float64Array(components);
+
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      const shift = (t / cycleSeconds) % 1;
+      let sample = 0;
+      for (let k = 0; k < components; k++) {
+        let position = k - shift;
+        if (position < 0) position += components;
+        const freq = minFreq * 2 ** position;
+        const x = (position - components / 2) / (components / 5);
+        const amp = Math.exp(-0.5 * x * x);
+        phases[k] += (2 * Math.PI * freq) / sampleRate;
+        sample += amp * Math.sin(phases[k]);
+      }
+      const edge = Math.min(1, i / fade, (length - i) / fade);
+      data[i] = (sample / components) * 0.6 * edge;
     }
 
-    if (this.isInitializing) {
-      return;
-    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    this.shepardSource = source;
+    return new Promise((resolve) => {
+      source.onended = () => {
+        if (this.shepardSource === source) this.shepardSource = null;
+        resolve();
+      };
+      source.start();
+    });
+  }
 
-    this.isInitializing = true;
-
+  stopShepard(): void {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-
-      // Resume if suspended (common in modern browsers)
-      if (audioContext.state === 'suspended') {
-        audioContext.resume().catch(() => {
-          console.warn('AudioContext resume failed - will retry on first user interaction');
-        });
-      }
-
-      this.audioContext = audioContext;
-    } catch (error) {
-      console.error('Failed to initialize AudioContext:', error);
-      this.isInitializing = false;
-      throw error;
+      this.shepardSource?.stop();
+    } catch {
+      // ya terminó
     }
+    this.shepardSource = null;
   }
 
-  /**
-   * Ensure instruments are loaded from soundfont
-   */
-  private async ensureInstrumentsLoaded(): Promise<void> {
-    if (this.initializePromise) {
-      return this.initializePromise;
-    }
-
-    if (this.pianoInstrument && this.synthInstrument) {
-      return;
-    }
-
-    this.initializePromise = this.loadInstruments();
-    return this.initializePromise;
-  }
-
-  /**
-   * Load soundfont instruments
-   */
-  private async loadInstruments(): Promise<void> {
-    if (!this.audioContext) {
-      this.lazyInitializeAudioContext();
-      if (!this.audioContext) {
-        throw new Error('AudioContext still not initialized');
-      }
-    }
-
-    try {
-      // Resume context if suspended (browser autoplay policy)
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
-
-      console.log('Loading soundfont instruments...');
-
-      // Load instruments from MusyngKite CDN soundfont
-      const pianoInstrument = await Soundfont.instrument(this.audioContext, 'acoustic_grand_piano', {
-        soundfont: 'MusyngKite',
-      });
-
-      // Use violin_pad (synth) instead of synth_pad_warm which doesn't exist
-      const synthInstrument = await Soundfont.instrument(this.audioContext, 'pad_2_warm', {
-        soundfont: 'MusyngKite',
-      });
-
-      this.pianoInstrument = pianoInstrument;
-      this.synthInstrument = synthInstrument;
-
-      console.log('Soundfont instruments loaded successfully');
-    } catch (error) {
-      console.error('Failed to load soundfont instruments:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get instrument based on timbre
-   */
-  private getInstrument(timbre: Timbre): any {
-    if (timbre === 'piano') {
-      return this.pianoInstrument;
-    } else if (timbre === 'sine') {
-      return this.synthInstrument;
-    }
-    return null;
-  }
-
-  /**
-   * Play a note with specified octave and timbre
-   * @param note - Musical note (C-B chromatic)
-   * @param octave - Octave (1, 2, 3, 4, 5, or 6)
-   * @param timbre - Timbre (piano or sine)
- * @param durationMs - Duration in milliseconds
-   * @returns Promise resolving when playback scheduled
-   */
-  async playNote(
-    note: ChromaticNote,
-    octave: Octave,
-    timbre: Timbre,
-    durationMs: number = 2500
-  ): Promise<void> {
-    await this.ensureInstrumentsLoaded();
-
-    // Cancel any currently playing note
-    if (this.currentNoteController) {
-      this.currentNoteController.abort();
-    }
-
-    // Create new abort controller for this note
-    this.currentNoteController = new AbortController();
-    const signal = this.currentNoteController.signal;
-
-    const instrument = this.getInstrument(timbre);
-    if (!instrument) {
-      throw new Error(`Unknown timbre: ${timbre}`);
-    }
-
-    const midiNote = getMIDINote(note, octave);
-
-    try {
-      if (!this.audioContext) {
-        throw new Error('AudioContext not initialized');
-      }
-
-      // If already aborted, don't play
-      if (signal.aborted) {
-        return;
-      }
-
-      // Play the note for the specified duration
-      await instrument.play(midiNote, this.audioContext.currentTime, {
-        duration: durationMs / 1000,
-        gain: 1.0, // Full volume for clear pitch perception
-      });
-
-    } catch (error) {
-      // Ignore abort errors
-      if (error instanceof Error && error.name === 'AbortError') {
-        return;
-      }
-      console.error(`Failed to play note ${note}${octave}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Stop all currently playing notes
-   */
   stopAll(): void {
-    if (this.currentNoteController) {
-      this.currentNoteController.abort();
-      this.currentNoteController = null;
-    }
-  }
-
-  /**
-   * Test the audio engine by playing A4
-   */
-  async testAudio(): Promise<void> {
-    console.log('Testing audio with A4 (440 Hz)...');
-    await this.playNote('A', 4, 'piano', 2000);
-  }
-
-  /**
-   * Dispose of audio resources
-   */
-  dispose(): void {
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      this.audioContext.close().catch(() => {
-        console.warn('Failed to close AudioContext');
-      });
-    }
-    this.audioContext = null;
-    this.pianoInstrument = null;
-    this.synthInstrument = null;
+    this.stopNotes();
+    this.stopShepard();
   }
 }
 
-/**
- * Global singleton instance
- */
-let globalEngine: AudioEngine | null = null;
+let engine: AudioEngine | null = null;
 
-/**
- * Get or create global audio engine instance
- */
 export function getAudioEngine(): AudioEngine {
-  if (!globalEngine) {
-    globalEngine = new AudioEngine();
-  }
-  return globalEngine;
-}
-
-/**
- * Test all notes in a given octave
- * Useful for debugging and verification
- */
-export async function testAllNotes(octave: Octave = 4): Promise<void> {
-  const engine = getAudioEngine();
-
-  console.log(`Testing all notes in octave ${octave} with piano timbre...`);
-
-  for (const note of CHROMATIC_NOTES) {
-    console.log(`Playing ${note}${octave}`);
-    await engine.playNote(note, octave, 'piano', 2000);
-    // Small delay between notes to avoid overlap
-    await new Promise(resolve => setTimeout(resolve, 2200));
-  }
-
-  console.log('Test complete');
+  if (!engine) engine = new AudioEngine();
+  return engine;
 }

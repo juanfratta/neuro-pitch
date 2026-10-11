@@ -1,138 +1,45 @@
-# Absolute Pitch Trainer
+# Neuro Pitch
 
-> A scientific application to train absolute pitch recognition based on the Wong 2025 protocol
+Entrenamiento de oído absoluto para adultos basado en el protocolo de Wong, Cheung, Ngan y Wong (2025), "Learning fast and accurate absolute pitch judgment in adulthood", *Psychonomic Bulletin & Review* 32:1676–1688 ([doi:10.3758/s13423-024-02620-2](https://doi.org/10.3758/s13423-024-02620-2)).
 
-🎵 **Train your ability to recognize musical notes** without external reference. A research-based tool for musicians and audio enthusiasts wanting to develop absolute pitch.
+## Qué hace
 
-## 🎯 Features
+1. **Test inicial.** 144 notas sueltas, piano y guitarra, tres octavas, notas consecutivas a más de 12 semitonos, sin feedback. Es la línea de base.
+2. **Entrenamiento.** Se arranca con F y se agrega una nota vecina por etapa (F, E, F#, D#, G…). Cada etapa tiene 24 niveles: la exigencia sube de 20% a 90%, primero con feedback y después sin, y la ventana de respuesta se ajusta a la de la tabla del paper (1.183 ms con 1 nota a 2.028 ms con 12).
+3. **Tonos fuera de rango.** En cada trial pueden sonar las notas vecinas a 1 y 2 semitonos del set aprendido; se responden con el botón "Fuera de rango". Así, aun con una sola nota, hay que reconocerla por cómo suena.
+4. **Herramientas del paper.** Muestras antes de cada nivel, tono de Shepard de 20 s antes de un nivel sin feedback, salto de nivel, retroceso tras 10 intentos fallidos y ejercicios sobre la nota más floja.
+5. **Cierre.** Pasar el último nivel tres veces seguidas y después una vez al primer intento, tras 12 h sin entrenar.
+6. **Test de progreso.** El mismo test del inicio, con 10 h de entrenamiento como mínimo, una vez por semana y con 12 h sin entrenar antes. Reporta aciertos, error en semitonos y tiempo, por timbre.
 
-- **8 weeks of progressive training** - Start with 2 notes (D# and F#), gradually adding up to 11 notes
-- **30 attempts per session** - Short, focused sessions (~15 minutes)
-- **Automatic advancement** - Requires 3 consecutive sessions with ≥90% accuracy + response time threshold
-- **High-quality audio** - Acoustic piano via Soundfont (MusyngKite)
-- **Optimized duration** - 2.5-second notes for clarity and retention
-- **Retention tests** - Assessments at weeks 2, 4, and final for progress tracking
-- **Two modes**: User (simple dashboard) and Researcher (analysis + export)
+Qué esperar: en el estudio, músicos adultos que entrenaron unas 21 h en 8 semanas aprendieron en promedio 7 notas al 90%; dos de doce llegaron a las 12.
 
-## 🏗️ Requirements
+El detalle de qué sale del paper y qué es reconstrucción está en [docs/PROTOCOLO.md](docs/PROTOCOLO.md).
 
-- Node.js 18+
-- npm or yarn
-
-## 🚀 Quick Start
+## Desarrollo
 
 ```bash
-# Clone and install
-git clone https://github.com/usuario/neuro-pitch-app.git
-cd neuro-pitch-app
 npm install
-
-# Development
-npm run dev
-# Open http://localhost:5174
-
-# Build
+npm run dev        # http://localhost:5173
+npm test           # tests del motor del protocolo
 npm run build
-npm run preview
 ```
 
-## 📁 Project Structure
+Modo desarrollo: abrir con `?dev=1`. Muestra la respuesta esperada en cada trial, permite saltear el tono de Shepard, mover etapa y nivel, simular 12 h sin entrenar y exportar los datos en JSON o CSV. Se apaga con `?dev=0`.
+
+## Estructura
 
 ```
 src/
-├── components/           # React components
-├── state/               # Context API + State Machine
-├── audio/               # Audio engine (Soundfont)
-├── utils/               # Randomization, storage
-├── protocol/            # Protocol configuration
-├── types/               # TypeScript types
-└── styles/              # CSS styles
+  protocol/   motor puro y testeado: notas, currículum, escalera, avance, tests
+  audio/      soundfonts, clips de 800 ms, tono de Shepard
+  state/      datos del usuario (localStorage) y reglas de calendario
+  hooks/      useTrialRunner: un trial = escuchar, responder dentro de la ventana
+  screens/    Inicio, Entrenamiento, Test
+  components/ piezas de UI
 ```
 
-## 🔧 Tech Stack
+Los parámetros del protocolo están todos en `src/protocol/params.ts`.
 
-| Layer | Technology |
-|-------|-----------|
-| **Framework** | React 19 + TypeScript |
-| **Build** | Vite 7 + SWC |
-| **Audio** | soundfont-player (MIDI) |
-| **State** | Context API |
-| **Data** | localStorage |
-| **Linting** | ESLint 9 |
+## Licencia
 
-## 🎓 The Protocol
-
-**Based on Wong 2025**
-
-- **Levels**: 10 progressive (2 → 11 notes)
-- **Structure**: 30 trials/session, 8 weeks
-- **Advancement**: 3 consecutive sessions ≥90% accuracy
-- **Audio**: Piano 2.5 seconds, octaves 3-6
-- **Anti-relative-pitch**: Prevents learning relative intervals
-
-## 📊 Session Flow
-
-1. A note is played (piano, 2.5 sec)
-2. User selects the note from 12 buttons
-3. Immediate feedback (Correct/Incorrect/Slow)
-4. Next trial (×30)
-5. SessionSummary shows accuracy %
-6. Auto-returns to dashboard
-
-## 🚢 Deployment
-
-### Netlify (recommended)
-```bash
-npm run build
-# Drag & drop dist/ folder to https://app.netlify.com
-```
-
-### Vercel
-```bash
-npm i -g vercel && vercel
-```
-
-## 🔬 Research Mode
-
-Access via checkbox on initial screen
-
-**Features:**
-- RT heatmap by note
-- Error distribution
-- Learning curve
-- Proficiency by note
-- JSON/CSV export
-- Debug information
-
-## 💾 Data Persistence
-
-- **Data**: localStorage (all trials, sessions, profile)
-- **Offline**: Fully functional without internet
-- **Export**: Button to download JSON with complete history
-
-## 🤝 Contributing
-
-PRs welcome. For major changes:
-1. Open an Issue
-2. Fork → feature branch
-3. Clear commits
-4. Push and PR
-
-## 📖 For Developers
-
-Complete technical documentation in [AGENTS.md](./AGENTS.md):
-- Detailed architecture
-- How to modify the protocol
-- Design decisions
-- Extension guide
-- Component state
-- How to add features
-
-## 📝 License
-
-MIT - Free for academic and commercial use
-
----
-
-**Protocol Version**: wong-2025-v1  
-**Last Updated**: Feb 2026
+MIT
