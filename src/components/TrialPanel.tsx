@@ -3,6 +3,8 @@ import { OUT_OF_BOUND, displayNote, type Answer } from '../protocol/notes';
 import type { useTrialRunner } from '../hooks/useTrialRunner';
 import { ChromaWheel } from './ChromaWheel';
 import { readRevealAnswers } from '../utils/app-mode';
+import { useTranslation } from 'react-i18next';
+import { useFormat } from '../i18n/format';
 
 type Runner = ReturnType<typeof useTrialRunner>;
 
@@ -20,6 +22,8 @@ interface Props {
  */
 export function TrialPanel({ runner, options, feedback, windowMs, devMode = false }: Props) {
   const { phase, index, total, lastRecord, current, error, start, answer } = runner;
+  const { t } = useTranslation();
+  const fmt = useFormat();
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -33,23 +37,23 @@ export function TrialPanel({ runner, options, feedback, windowMs, devMode = fals
   }, [phase, start]);
 
   const hint =
-    phase === 'ready' ? 'Tocá el centro o la barra espaciadora'
+    phase === 'ready' ? t('trial.ready')
     : phase === 'playing'
       ? options.includes(OUT_OF_BOUND)
         ? options.length === 2
-          ? `¿Es ${displayNote(options[0])}? Si no, tocá el centro: fuera de rango`
-          : '¿Qué escuchaste? Si no es ninguna de tus notas, tocá el centro'
-        : '¿Qué escuchaste?'
-    : phase === 'loading' ? 'Cargando'
+          ? t('trial.isIt', { note: displayNote(options[0]) })
+          : t('trial.whatMany')
+        : t('trial.what')
+    : phase === 'loading' ? t('trial.loading')
     : ' ';
 
   return (
     <div className="listening-room relative -mx-5 overflow-hidden rounded-2xl px-4 pb-5 pt-4 sm:mx-0 sm:px-6">
       <div className="flex items-baseline justify-between text-[13px] text-[var(--np-mist)]">
         <span className="tabular-nums">
-          {Math.min(index + 1, total)} de {total}
+          {t('trial.count', { current: Math.min(index + 1, total), total })}
         </span>
-        <span className="tabular-nums">{(windowMs / 1000).toFixed(2)} s para responder</span>
+        <span className="tabular-nums">{t('trial.window', { seconds: fmt.seconds(windowMs) })}</span>
       </div>
 
       {total <= 40 ? (
@@ -84,8 +88,8 @@ export function TrialPanel({ runner, options, feedback, windowMs, devMode = fals
       <p className="mt-2 text-center text-sm text-[var(--np-mist)]" aria-live="polite">
         {hint}
       </p>
-      {error && <p className="mt-2 text-center text-sm text-[var(--np-coral)]">{error}</p>}
-      <p className="mt-4 text-center text-xs text-[var(--np-muted)]">Sin cantar, tararear ni usar referencias.</p>
+      {error && <p className="mt-2 text-center text-sm text-[var(--np-coral)]">{t('trial.playError')}</p>}
+      <p className="mt-4 text-center text-xs text-[var(--np-muted)]">{t('trial.noSinging')}</p>
 
       {devMode && readRevealAnswers() && current && (
         <p className="mt-2 text-center font-mono text-[11px] text-[var(--np-coral)]">

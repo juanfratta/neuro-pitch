@@ -5,6 +5,8 @@ import { TrainingFlow } from './screens/TrainingFlow';
 import { TestFlow } from './screens/TestFlow';
 import { readDevMode } from './utils/app-mode';
 import { Card } from './components/ui';
+import { useTranslation } from 'react-i18next';
+import { LANGUAGES, currentLanguage, setLanguage } from './i18n';
 
 type Screen = { name: 'home' } | { name: 'training' } | { name: 'test'; kind: 'pre' | 'post' };
 type Theme = 'light' | 'dark';
@@ -23,6 +25,8 @@ function Shell() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' });
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [devMode] = useState(readDevMode);
+  const { t, i18n } = useTranslation();
+  const lang = currentLanguage(i18n.language);
   const home = () => setScreen({ name: 'home' });
 
   useEffect(() => {
@@ -37,23 +41,46 @@ function Shell() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(103,232,249,0.18),_transparent_38%)] dark:bg-[radial-gradient(circle_at_top,_rgba(14,116,144,0.28),_transparent_40%)]">
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-slate-50/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
           <p className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Neuro Pitch</p>
-          {devMode && (
-            <a
-              href={window.location.pathname}
-              title="Salir del modo desarrollo"
-              className="rounded-full border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300"
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {devMode && (
+              <a
+                href={window.location.pathname}
+                title={t('common.devExit')}
+                className="rounded-full border border-amber-400 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300"
+              >
+                {t('common.devBadge')}
+              </a>
+            )}
+            <div
+              role="group"
+              aria-label={t('common.language')}
+              className="inline-flex overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700"
             >
-              Modo desarrollo · salir
-            </a>
-          )}
-          <button
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
-            onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
-          >
-            {theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
-          </button>
+              {LANGUAGES.map((code) => (
+                <button
+                  key={code}
+                  lang={code}
+                  aria-pressed={lang === code}
+                  onClick={() => setLanguage(code)}
+                  className={`px-2.5 py-1.5 text-xs font-semibold uppercase transition ${
+                    lang === code
+                      ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+                  }`}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+            <button
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+              onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
+            >
+              {theme === 'light' ? t('common.themeDark') : t('common.themeLight')}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -80,7 +107,7 @@ function Shell() {
           rel="noreferrer"
           className="text-[11px] text-slate-400 underline-offset-2 hover:underline dark:text-slate-500"
         >
-          Basado en Wong et al. (2025), Psychonomic Bulletin &amp; Review
+          {t('common.basedOn')}
         </a>
       </footer>
     </div>

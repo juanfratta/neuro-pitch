@@ -26,7 +26,7 @@ export function useTrialRunner({ stimuli, windowMs, feedback, onDone }: Options)
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<TrialPhase>('ready');
   const [records, setRecords] = useState<TrialRecord[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
   const onsetRef = useRef<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,7 +78,7 @@ export function useTrialRunner({ stimuli, windowMs, feedback, onDone }: Options)
 
   const start = useCallback(async () => {
     if (phase !== 'ready') return;
-    setError(null);
+    setError(false);
     setPhase('loading');
     settledRef.current = false;
     onsetRef.current = null;
@@ -92,7 +92,7 @@ export function useTrialRunner({ stimuli, windowMs, feedback, onDone }: Options)
       timeoutRef.current = setTimeout(() => settle(null, null), Math.max(0, remaining));
     } catch (e) {
       console.error(e);
-      setError('No se pudo reproducir el sonido. Revisá la conexión y probá de nuevo.');
+      setError(true);
       setPhase('ready');
     }
   }, [phase, engine, stimuli, index, windowMs, settle]);

@@ -56,6 +56,3 @@ export function displayNote(note: string): string {
   return alt ? `${main}/${alt}` : main;
 }
 
-export function answerLabel(answer: Answer): string {
-  return answer === OUT_OF_BOUND ? 'Fuera de rango' : displayNote(answer);
-}

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { getAudioEngine } from '../audio/engine';
 import { OCTAVES, displayNote, toMidi, type Chroma } from '../protocol/notes';
 import { createRng, shuffle } from '../protocol/rng';
+import { useTranslation } from 'react-i18next';
 
 const GAP_MS = 1100;
 
@@ -12,6 +13,7 @@ const GAP_MS = 1100;
 export function SamplePlayer({ notes, onPlayed }: { notes: Chroma[]; onPlayed: () => void }) {
   const [playing, setPlaying] = useState<Chroma | null>(null);
   const rng = useRef(createRng());
+  const { t } = useTranslation();
 
   const play = async (chroma: Chroma) => {
     if (playing) return;
@@ -35,7 +37,7 @@ export function SamplePlayer({ notes, onPlayed }: { notes: Chroma[]; onPlayed: (
           key={note}
           onClick={() => void play(note)}
           disabled={playing !== null}
-          aria-label={`Escuchar ${note}`}
+          aria-label={t('samples.listen', { note: displayNote(note) })}
           className={`font-display h-12 min-w-12 rounded-full border px-3 text-lg font-semibold transition disabled:cursor-not-allowed ${
             playing === note
               ? 'border-[var(--np-brass)] bg-[var(--np-brass)] text-[var(--np-on-accent)]'

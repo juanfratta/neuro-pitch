@@ -14,6 +14,8 @@ Antes de tocar la lógica, leer `docs/PROTOCOLO.md`: explica qué parte sale del
 - Las teclas negras se muestran con sus dos nombres (C♯/D♭): `displayNote` para texto, `noteParts` para dibujarlos en dos líneas.
 - Durante un trial nada en pantalla puede depender de la nota antes de responder (el pulso es igual para las 12).
 - Colores de la sala de escucha: variables `--np-*` en `src/index.css`, con paleta de día (`:root`) y de noche (`.dark`). No hardcodear hex en la rueda ni en la hélice. En SVG, los colores con `var()` van en `style` de elementos comunes, no en props de `motion` (no se actualizan).
+- Todo texto visible va por i18n (`react-i18next`): claves en `src/i18n/es.ts` (referencia) y `src/i18n/en.ts` (el tipo obliga a tener las mismas). Números con `useFormat()` para el separador decimal de cada idioma. Nada de strings sueltos en componentes.
+- Idioma: por defecto el del navegador (es-* → español, el resto → inglés); la elección manual se guarda en `neuro_pitch_lang`.
 - Datos persistidos en `localStorage` bajo `neuro_pitch_v3`. Si cambia la forma de `UserData`, subir `DATA_VERSION` en `src/state/userData.ts`.
 
 ## Flujo

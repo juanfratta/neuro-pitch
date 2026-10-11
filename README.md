@@ -15,6 +15,10 @@ Qué esperar: en el estudio, músicos adultos que entrenaron unas 21 h en 8 sema
 
 El detalle de qué sale del paper y qué es reconstrucción está en [docs/PROTOCOLO.md](docs/PROTOCOLO.md).
 
+## Idiomas
+
+Español e inglés. Arranca en el idioma del navegador (cualquier variante de español → español; el resto → inglés) y se puede cambiar con el selector ES/EN del encabezado, que queda guardado. Los textos están en `src/i18n/es.ts` y `src/i18n/en.ts`.
+
 ## Desarrollo
 
 ```bash
