@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -35,6 +35,13 @@
 }
 
 @layer components {
+  .listening-room {
+    background:
+      radial-gradient(circle at 50% 46%, rgb(34 49 79 / 0.85), transparent 62%),
+      #0F1B33;
+    color: #E6ECF5;
+  }
+
   .spinner {
     width: 40px;
     height: 40px;
