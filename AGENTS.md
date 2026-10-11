@@ -28,4 +28,4 @@ Antes de tocar la lógica, leer `docs/PROTOCOLO.md`: explica qué parte sale del
 npm test && npx tsc -b && npx eslint src && npm run build
 ```
 
-Para probar a mano, `?dev=1`.
+Para probar a mano, `?dev=1` (no se guarda: dura mientras esté en la URL). Mostrar la respuesta en cada trial es un checkbox aparte del panel de desarrollo.

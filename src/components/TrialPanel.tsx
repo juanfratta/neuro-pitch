@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { OUT_OF_BOUND, displayNote, type Answer } from '../protocol/notes';
 import type { useTrialRunner } from '../hooks/useTrialRunner';
 import { ChromaWheel } from './ChromaWheel';
+import { readRevealAnswers } from '../utils/app-mode';
 
 type Runner = ReturnType<typeof useTrialRunner>;
 
@@ -86,8 +87,8 @@ export function TrialPanel({ runner, options, feedback, windowMs, devMode = fals
       {error && <p className="mt-2 text-center text-sm text-[var(--np-coral)]">{error}</p>}
       <p className="mt-4 text-center text-xs text-[var(--np-muted)]">Sin cantar, tararear ni usar referencias.</p>
 
-      {devMode && current && (
-        <p className="mt-2 text-center font-mono text-[11px] text-[var(--np-muted)]">
+      {devMode && readRevealAnswers() && current && (
+        <p className="mt-2 text-center font-mono text-[11px] text-[var(--np-coral)]">
           dev: {current.chroma}
           {current.octave} · midi {current.midi} · {current.timbre} · esperado {current.expected}
         </p>
