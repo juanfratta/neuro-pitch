@@ -25,17 +25,21 @@ const RING_OUTER = 204;
 const RING_LABEL = (RING_INNER + RING_OUTER) / 2 - 4;
 const LOCKED_LABEL_RADIUS = 120;
 
+/** Colores por tema: definidos como variables en index.css (.dark cambia la paleta). */
 const COLORS = {
-  night: '#0F1B33',
-  deep: '#0A1326',
-  slate: '#22314F',
-  faint: '#3A4A6B',
-  mist: '#A9B6CF',
-  brass: '#E3B35C',
-  mint: '#7FD1AE',
-  coral: '#FF7A6B',
-  lavender: '#8E93D6',
+  room: 'var(--np-room)',
+  surface: 'var(--np-surface)',
+  dot: 'var(--np-dot)',
+  center: 'var(--np-center)',
+  onAccent: 'var(--np-on-accent)',
+  faint: 'var(--np-faint)',
+  mist: 'var(--np-mist)',
+  brass: 'var(--np-brass)',
+  mint: 'var(--np-mint)',
+  coral: 'var(--np-coral)',
+  lavender: 'var(--np-lavender)',
 };
+const FILL_TRANSITION = 'fill 200ms ease, stroke 200ms ease, stroke-opacity 200ms ease';
 
 function polar(index: number, radius: number) {
   const angle = ((index * 30 - 90) * Math.PI) / 180;
@@ -135,9 +139,9 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
     <svg viewBox={hasOutOfBound ? `0 0 ${SIZE} ${SIZE}` : `${C - 176} ${C - 176} 352 352`} className="mx-auto block w-full max-w-[440px] select-none" role="group" aria-label="Rueda de notas">
       <defs>
         <radialGradient id="wheel-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={COLORS.slate} stopOpacity="0.9" />
-          <stop offset="70%" stopColor={COLORS.night} stopOpacity="0.4" />
-          <stop offset="100%" stopColor={COLORS.night} stopOpacity="0" />
+          <stop offset="0%" stopColor={COLORS.surface} stopOpacity="0.9" />
+          <stop offset="70%" stopColor={COLORS.room} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={COLORS.room} stopOpacity="0" />
         </radialGradient>
         <path id="ring-label-path" d={`M ${C - RING_LABEL} ${C} A ${RING_LABEL} ${RING_LABEL} 0 0 1 ${C + RING_LABEL} ${C}`} />
       </defs>
@@ -155,18 +159,21 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
           onKeyDown={keyActivate(() => answering && onAnswer(OUT_OF_BOUND))}
           className={answering ? 'cursor-pointer outline-none' : 'outline-none'}
         >
-          <motion.path
+          <path
             d={ringPath()}
             fill="none"
             strokeWidth={RING_OUTER - RING_INNER}
-            animate={{
-              stroke:
-                ringState === 'correct' ? COLORS.mint : ringState === 'wrong' ? COLORS.coral : COLORS.lavender,
-              strokeOpacity: ringState === 'active' ? 0.38 : ringState === 'idle' ? 0.14 : 0.75,
+            style={{
+              stroke: ringState === 'correct' ? COLORS.mint : ringState === 'wrong' ? COLORS.coral : COLORS.lavender,
+              strokeOpacity: ringState === 'active' ? 0.4 : ringState === 'idle' ? 0.16 : 0.85,
+              transition: reduceMotion ? undefined : FILL_TRANSITION,
             }}
-            transition={{ duration: reduceMotion ? 0 : 0.25 }}
           />
-          <text fontSize="11" letterSpacing="3" fill={ringState === 'idle' ? COLORS.faint : COLORS.deep} style={{ fontWeight: 600 }}>
+          <text
+            fontSize="11"
+            letterSpacing="3"
+            style={{ fontWeight: 600, fill: ringState === 'idle' ? COLORS.faint : ringState === 'active' ? COLORS.mist : COLORS.onAccent }}
+          >
             <textPath href="#ring-label-path" startOffset="50%" textAnchor="middle">
               fuera de rango
             </textPath>
@@ -175,7 +182,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
       )}
 
       {/* Guía circular de las notas */}
-      <circle cx={C} cy={C} r={NOTE_RADIUS} fill="none" stroke={COLORS.faint} strokeOpacity={0.35} strokeWidth={1} />
+      <circle cx={C} cy={C} r={NOTE_RADIUS} fill="none" style={{ stroke: COLORS.faint }} strokeOpacity={0.45} strokeWidth={1} />
 
       {/* Arco de error */}
       {arc && (
@@ -183,7 +190,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
           key={`arc-${trialIndex}`}
           d={arc}
           fill="none"
-          stroke={COLORS.coral}
+          style={{ stroke: COLORS.coral }}
           strokeWidth={6}
           strokeLinecap="round"
           initial={{ pathLength: reduceMotion ? 1 : 0, opacity: 0.9 }}
@@ -202,11 +209,11 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
           state === 'correct' ? COLORS.mint
           : state === 'wrong' ? COLORS.coral
           : state === 'active' ? COLORS.brass
-          : state === 'idle' ? COLORS.slate
+          : state === 'idle' ? COLORS.surface
           : state === 'reveal' ? COLORS.faint
-          : COLORS.deep;
+          : COLORS.dot;
         const textColor =
-          state === 'active' || state === 'correct' || state === 'wrong' ? COLORS.deep
+          state === 'active' || state === 'correct' || state === 'wrong' ? COLORS.onAccent
           : state === 'idle' ? COLORS.brass
           : state === 'reveal' ? COLORS.mist
           : COLORS.faint;
@@ -222,29 +229,32 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
             onKeyDown={keyActivate(() => clickable && onAnswer(note))}
             className={clickable ? 'cursor-pointer outline-none [&:focus-visible>circle]:stroke-white' : 'outline-none'}
           >
-            <motion.circle
-              cx={x}
-              cy={y}
-              r={isLockedDot ? 9 : NOTE_SIZE}
-              initial={false}
-              animate={{ r: isLockedDot ? 9 : NOTE_SIZE, fill }}
-              stroke={state === 'idle' ? COLORS.brass : 'transparent'}
-              strokeOpacity={0.5}
-              strokeWidth={1.5}
-              transition={{ duration: reduceMotion ? 0 : 0.2 }}
+            <motion.g
               whileHover={clickable && !reduceMotion ? { scale: 1.08 } : undefined}
               whileTap={clickable && !reduceMotion ? { scale: 0.94 } : undefined}
               style={{ transformOrigin: `${x}px ${y}px` }}
-            />
+            >
+              <circle
+                cx={x}
+                cy={y}
+                r={isLockedDot ? 9 : NOTE_SIZE}
+                strokeOpacity={0.6}
+                strokeWidth={1.5}
+                style={{
+                  fill,
+                  stroke: state === 'idle' ? COLORS.brass : 'transparent',
+                  transition: reduceMotion ? undefined : FILL_TRANSITION,
+                }}
+              />
+            </motion.g>
             <text
               x={isLockedDot ? label.x : x}
               y={isLockedDot ? label.y : y}
               dy="0.35em"
               textAnchor="middle"
               fontSize={isLockedDot ? 11 : 20}
-              fill={textColor}
               className="pointer-events-none"
-              style={{ fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600 }}
+              style={{ fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600, fill: textColor }}
             >
               {displayNote(note)}
             </text>
@@ -253,7 +263,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
       })}
 
       {/* Temporizador: se vacía durante la ventana de respuesta */}
-      <circle cx={C} cy={C} r={TIMER_RADIUS} fill="none" stroke={COLORS.faint} strokeOpacity={0.3} strokeWidth={3} />
+      <circle cx={C} cy={C} r={TIMER_RADIUS} fill="none" style={{ stroke: COLORS.faint }} strokeOpacity={0.4} strokeWidth={3} />
       {phase === 'playing' && (
         <motion.circle
           key={`timer-${trialIndex}`}
@@ -261,7 +271,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
           cy={C}
           r={TIMER_RADIUS}
           fill="none"
-          stroke={COLORS.brass}
+          style={{ stroke: COLORS.brass }}
           strokeWidth={3}
           strokeLinecap="round"
           strokeDasharray={timerLength}
@@ -280,7 +290,7 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
           cy={C}
           r={CENTER_RADIUS}
           fill="none"
-          stroke={COLORS.brass}
+          style={{ stroke: COLORS.brass }}
           strokeWidth={2}
           initial={{ r: CENTER_RADIUS, opacity: 0.7 }}
           animate={{ r: TIMER_RADIUS + 26, opacity: 0 }}
@@ -297,31 +307,33 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
         onKeyDown={keyActivate(() => phase === 'ready' && onListen())}
         className={phase === 'ready' ? 'cursor-pointer outline-none' : 'outline-none'}
       >
-        <motion.circle
-          cx={C}
-          cy={C}
-          r={CENTER_RADIUS}
-          animate={{
-            fill: phase === 'ready' ? COLORS.brass : COLORS.deep,
-            stroke: phase === 'ready' ? COLORS.brass : COLORS.slate,
-          }}
-          strokeWidth={2}
-          transition={{ duration: reduceMotion ? 0 : 0.2 }}
+        <motion.g
           whileHover={phase === 'ready' && !reduceMotion ? { scale: 1.04 } : undefined}
           style={{ transformOrigin: `${C}px ${C}px` }}
-        />
+        >
+          <circle
+            cx={C}
+            cy={C}
+            r={CENTER_RADIUS}
+            strokeWidth={2}
+            style={{
+              fill: phase === 'ready' ? COLORS.brass : COLORS.center,
+              stroke: phase === 'ready' ? COLORS.brass : COLORS.faint,
+              transition: reduceMotion ? undefined : FILL_TRANSITION,
+            }}
+          />
+        </motion.g>
         {phase === 'loading' && (
           <motion.circle
             cx={C}
             cy={C}
             r={18}
             fill="none"
-            stroke={COLORS.mist}
             strokeWidth={2}
             strokeDasharray="28 200"
             animate={reduceMotion ? undefined : { rotate: 360 }}
             transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }}
-            style={{ transformOrigin: `${C}px ${C}px` }}
+            style={{ transformOrigin: `${C}px ${C}px`, stroke: COLORS.mist }}
           />
         )}
         <text
@@ -330,13 +342,15 @@ export function ChromaWheel({ options, phase, trialIndex, windowMs, feedback, la
           dy="0.35em"
           textAnchor="middle"
           fontSize={centerLabel.length > 10 ? 15 : 19}
-          fill={
-            phase === 'ready' ? COLORS.deep
-            : showFeedback ? (lastRecord!.correct ? COLORS.mint : COLORS.coral)
-            : COLORS.mist
-          }
           className="pointer-events-none"
-          style={{ fontFamily: '"Fraunces", Georgia, serif', fontWeight: 600 }}
+          style={{
+            fontFamily: '"Fraunces", Georgia, serif',
+            fontWeight: 600,
+            fill:
+              phase === 'ready' ? COLORS.onAccent
+              : showFeedback ? (lastRecord!.correct ? COLORS.mint : COLORS.coral)
+              : COLORS.mist,
+          }}
         >
           {centerLabel}
         </text>

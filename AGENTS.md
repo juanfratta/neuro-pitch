@@ -9,6 +9,9 @@ Antes de tocar la lógica, leer `docs/PROTOCOLO.md`: explica qué parte sale del
 - El tiempo de respuesta se mide desde el inicio de la nota (`AudioEngine.playMidi` devuelve ese instante). Las opciones se habilitan recién cuando la nota empieza a sonar.
 - Nunca mostrar la respuesta correcta en niveles sin feedback ni en los tests.
 - Notas consecutivas en los tests: siempre a más de 12 semitonos (`TEST_MIN_SEMITONE_GAP`).
+- La hélice 3D (`PitchHelix`, Three.js) va solo en el inicio y en la pantalla del tono de Shepard, siempre con `lazy()`. Nunca durante un trial: mostraría la octava de lo que suena.
+- Durante un trial nada en pantalla puede depender de la nota antes de responder (el pulso es igual para las 12).
+- Colores de la sala de escucha: variables `--np-*` en `src/index.css`, con paleta de día (`:root`) y de noche (`.dark`). No hardcodear hex en la rueda ni en la hélice. En SVG, los colores con `var()` van en `style` de elementos comunes, no en props de `motion` (no se actualizan).
 - Datos persistidos en `localStorage` bajo `neuro_pitch_v3`. Si cambia la forma de `UserData`, subir `DATA_VERSION` en `src/state/userData.ts`.
 
 ## Flujo

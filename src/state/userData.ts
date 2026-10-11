@@ -210,3 +210,17 @@ export function formatDuration(ms: number): string {
   if (h === 0) return `${m} min`;
   return `${h} h ${String(m).padStart(2, '0')} min`;
 }
+
+/**
+ * Acierto por nota aprendida en las últimas tandas de nivel (0-100).
+ * Solo incluye notas con suficientes trials para que el número signifique algo.
+ */
+export function noteAccuracy(data: UserData, attempts = 10, minTrials = 5): Partial<Record<Chroma, number>> {
+  const trials = recentLevelTrials(data, attempts);
+  const out: Partial<Record<Chroma, number>> = {};
+  for (const chroma of CHROMAS) {
+    const own = trials.filter((t) => t.stimulus.expected === chroma);
+    if (own.length >= minTrials) out[chroma] = (own.filter((t) => t.correct).length / own.length) * 100;
+  }
+  return out;
+}

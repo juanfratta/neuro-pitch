@@ -15,7 +15,7 @@ interface Props {
 
 /**
  * Sala de escucha: panel oscuro con la rueda cromática.
- * Se ve igual en tema claro y oscuro, para que el foco quede en el sonido.
+ * Tiene paleta de día y de noche (variables --np-* en index.css).
  */
 export function TrialPanel({ runner, options, feedback, windowMs, devMode = false }: Props) {
   const { phase, index, total, lastRecord, current, error, start, answer } = runner;
@@ -39,7 +39,7 @@ export function TrialPanel({ runner, options, feedback, windowMs, devMode = fals
 
   return (
     <div className="listening-room relative -mx-5 overflow-hidden rounded-2xl px-4 pb-5 pt-4 sm:mx-0 sm:px-6">
-      <div className="flex items-baseline justify-between text-[13px] text-[#A9B6CF]">
+      <div className="flex items-baseline justify-between text-[13px] text-[var(--np-mist)]">
         <span className="tabular-nums">
           {Math.min(index + 1, total)} de {total}
         </span>
@@ -52,13 +52,13 @@ export function TrialPanel({ runner, options, feedback, windowMs, devMode = fals
             <span
               key={i}
               className="h-1 flex-1 rounded-full"
-              style={{ background: i < index ? '#E3B35C' : i === index ? '#E3B35C80' : '#22314F' }}
+              style={{ background: i <= index ? 'var(--np-brass)' : 'var(--np-track)', opacity: i === index ? 0.5 : 1 }}
             />
           ))}
         </div>
       ) : (
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#22314F]" aria-hidden>
-          <div className="h-full rounded-full bg-[#E3B35C] transition-[width]" style={{ width: `${(index / total) * 100}%` }} />
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--np-track)]" aria-hidden>
+          <div className="h-full rounded-full bg-[var(--np-brass)] transition-[width]" style={{ width: `${(index / total) * 100}%` }} />
         </div>
       )}
 
@@ -75,14 +75,14 @@ export function TrialPanel({ runner, options, feedback, windowMs, devMode = fals
         />
       </div>
 
-      <p className="mt-2 text-center text-sm text-[#A9B6CF]" aria-live="polite">
+      <p className="mt-2 text-center text-sm text-[var(--np-mist)]" aria-live="polite">
         {hint}
       </p>
-      {error && <p className="mt-2 text-center text-sm text-[#FF7A6B]">{error}</p>}
-      <p className="mt-4 text-center text-xs text-[#6F7E9C]">Sin cantar, tararear ni usar referencias.</p>
+      {error && <p className="mt-2 text-center text-sm text-[var(--np-coral)]">{error}</p>}
+      <p className="mt-4 text-center text-xs text-[var(--np-muted)]">Sin cantar, tararear ni usar referencias.</p>
 
       {devMode && current && (
-        <p className="mt-2 text-center font-mono text-[11px] text-[#6F7E9C]">
+        <p className="mt-2 text-center font-mono text-[11px] text-[var(--np-muted)]">
           dev: {current.chroma}
           {current.octave} · midi {current.midi} · {current.timbre} · esperado {current.expected}
         </p>
