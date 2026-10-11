@@ -38,10 +38,7 @@ function Shell() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(103,232,249,0.18),_transparent_38%)] dark:bg-[radial-gradient(circle_at_top,_rgba(14,116,144,0.28),_transparent_40%)]">
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-slate-50/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Neuro Pitch</p>
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">Protocolo Wong et al. 2025</p>
-          </div>
+          <p className="font-display text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Neuro Pitch</p>
           {devMode && (
             <a
               href={window.location.pathname}
@@ -75,6 +72,17 @@ function Shell() {
           </Card>
         )}
       </main>
+
+      <footer className="mx-auto w-full max-w-6xl px-4 pb-6 pt-2">
+        <a
+          href="https://doi.org/10.3758/s13423-024-02620-2"
+          target="_blank"
+          rel="noreferrer"
+          className="text-[11px] text-slate-400 underline-offset-2 hover:underline dark:text-slate-500"
+        >
+          Basado en Wong et al. (2025), Psychonomic Bulletin &amp; Review
+        </a>
+      </footer>
     </div>
   );
 }
